@@ -15,6 +15,9 @@ env/
 instance/          # SQLite DB + instance config
 .env               # Never commit secrets
 .env.*
+ngrok.exe
+*.db
+*.sqlite3
 
 # ── Uploads (user-generated content) ──────────────────────────────────────────
 static/uploads/*
