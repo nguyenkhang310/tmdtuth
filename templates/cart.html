@@ -1,0 +1,331 @@
+{% extends 'base.html' %}
+{% block title %}Giỏ hàng - UTH Store{% endblock %}
+
+{% block extra_styles %}
+<style>
+.cart-page {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2.5rem 2rem;
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 2rem;
+    align-items: start;
+}
+
+.cart-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    grid-column: 1 / -1;
+}
+
+.cart-items {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.cart-item {
+    display: flex;
+    gap: 1.25rem;
+    background: white;
+    border-radius: 16px;
+    padding: 1.25rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    align-items: center;
+}
+
+.cart-item-img {
+    width: 90px;
+    height: 110px;
+    border-radius: 10px;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.cart-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.cart-item-name {
+    font-weight: 600;
+    font-size: 1rem;
+    margin-bottom: 0.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cart-item-meta {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+}
+
+.cart-item-price {
+    font-weight: 700;
+    color: var(--primary);
+    font-size: 1rem;
+}
+
+.cart-item-qty {
+    display: flex;
+    align-items: center;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.cart-item-qty button {
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: var(--surface2);
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background 0.2s;
+    font-family: inherit;
+}
+
+.cart-item-qty button:hover { background: var(--border); }
+
+.cart-item-qty input {
+    width: 40px;
+    height: 32px;
+    border: none;
+    text-align: center;
+    font-size: 0.9rem;
+    font-weight: 600;
+    font-family: inherit;
+    outline: none;
+}
+
+.cart-item-remove {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 8px;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    text-decoration: none;
+}
+
+.cart-item-remove:hover { background: #fee2e2; color: var(--red); }
+
+/* SUMMARY */
+.cart-summary {
+    background: white;
+    border-radius: 20px;
+    padding: 1.75rem;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    position: sticky;
+    top: 90px;
+}
+
+.summary-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid var(--border);
+}
+
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    font-size: 0.9rem;
+}
+
+.summary-row .label { color: var(--text-muted); }
+.summary-row .value { font-weight: 600; }
+
+.summary-total {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 1rem;
+    margin-top: 0.75rem;
+    border-top: 2px solid var(--border);
+}
+
+.summary-total .label { font-weight: 700; font-size: 1rem; }
+.summary-total .value { font-weight: 800; font-size: 1.4rem; color: var(--primary); }
+
+.promo-input {
+    display: flex;
+    gap: 0.5rem;
+    margin: 1.25rem 0;
+}
+
+.promo-input input {
+    flex: 1;
+    padding: 0.6rem 0.875rem;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-family: inherit;
+    outline: none;
+}
+
+.promo-input input:focus { border-color: var(--primary); }
+
+.promo-input button {
+    padding: 0.6rem 1rem;
+    background: var(--surface2);
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+}
+
+.promo-input button:hover { background: var(--border); }
+
+.checkout-btn {
+    width: 100%;
+    padding: 1rem;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+    margin-top: 1rem;
+    text-align: center;
+    text-decoration: none;
+    display: block;
+}
+
+.checkout-btn:hover {
+    background: var(--primary-light);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(10,92,54,0.3);
+}
+
+/* EMPTY CART */
+.empty-cart {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 5rem 2rem;
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.empty-cart .icon { font-size: 5rem; margin-bottom: 1.5rem; }
+.empty-cart h2 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.75rem; }
+.empty-cart p { color: var(--text-muted); margin-bottom: 2rem; }
+
+@media (max-width: 768px) {
+    .cart-page { grid-template-columns: 1fr; }
+    .cart-title { grid-column: 1; }
+    .cart-summary { position: static; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cart-page">
+    <h1 class="cart-title">Giỏ hàng của bạn </h1>
+    
+    {% if cart and cart.items %}
+    <!-- CART ITEMS -->
+    <div class="cart-items">
+        {% for item in cart.items %}
+        <div class="cart-item">
+            <img src="{{ item.product.image_url }}" alt="{{ item.product.name }}" class="cart-item-img">
+            <div class="cart-item-info">
+                <div class="cart-item-name">{{ item.product.name }}</div>
+                <div class="cart-item-meta">{{ item.product.category.name if item.product.category else 'UTH Store' }}</div>
+                <div class="cart-item-price">{{ "{:,.0f}".format(item.product.price) }}đ</div>
+            </div>
+            <div class="cart-item-qty">
+                <button>−</button>
+                <input type="number" value="{{ item.quantity }}" min="1">
+                <button>+</button>
+            </div>
+            <a href="{{ url_for('remove_from_cart', item_id=item.id) }}" class="cart-item-remove" title="Xóa">
+                <span class="material-symbols-outlined">delete</span>
+            </a>
+        </div>
+        {% endfor %}
+        
+        <div style="padding:1rem; text-align:left">
+            <a href="{{ url_for('products') }}" style="color:var(--primary); text-decoration:none; font-size:0.875rem; font-weight:600; display:flex; align-items:center; gap:0.25rem">
+                <span class="material-symbols-outlined" style="font-size:1rem">arrow_back</span>
+                Tiếp tục mua sắm
+            </a>
+        </div>
+    </div>
+    
+    <!-- SUMMARY -->
+    <div class="cart-summary">
+        <h2 class="summary-title">Tóm tắt đơn hàng</h2>
+        
+        {% set total = namespace(val=0) %}
+        {% for item in cart.items %}
+            {% set total.val = total.val + (item.product.price * item.quantity) %}
+        {% endfor %}
+        
+        <div class="summary-row">
+            <span class="label">Tạm tính ({{ cart.itemslength }} sản phẩm)</span>
+            <span class="value">{{ "{:,.0f}".format(total.val) }}đ</span>
+        </div>
+        <div class="summary-row">
+            <span class="label">Phí vận chuyển</span>
+            <span class="value" style="color:var(--primary)">{% if total.val >= 500000 %}Miễn phí{% else %}30.000đ{% endif %}</span>
+        </div>
+        
+        <div class="promo-input">
+            <input type="text" placeholder="Mã khuyến mại">
+            <button>Áp dụng</button>
+        </div>
+        
+        <div class="summary-total">
+            <span class="label">Tổng cộng</span>
+            <span class="value">{{ "{:,.0f}".format(total.val + (0 if total.val >= 500000 else 30000)) }}đ</span>
+        </div>
+        
+        <a href="#" class="checkout-btn">
+            Thanh toán ngay 
+        </a>
+        
+        <div style="display:flex; gap:0.5rem; justify-content:center; flex-wrap:wrap; margin-top:1.25rem">
+            <span style="padding:0.3rem 0.75rem; border:1.5px solid var(--border); border-radius:6px; font-size:0.75rem; font-weight:700; color:var(--text-muted)">VISA</span>
+            <span style="padding:0.3rem 0.75rem; border:1.5px solid var(--border); border-radius:6px; font-size:0.75rem; font-weight:700; color:var(--text-muted)">Mastercard</span>
+            <span style="padding:0.3rem 0.75rem; border:1.5px solid var(--border); border-radius:6px; font-size:0.75rem; font-weight:700; color:var(--text-muted)">COD</span>
+            <span style="padding:0.3rem 0.75rem; border:1.5px solid var(--border); border-radius:6px; font-size:0.75rem; font-weight:700; color:var(--text-muted)">MoMo</span>
+        </div>
+        <p style="text-align:center; font-size:0.75rem; color:var(--text-muted); margin-top:0.5rem; display:flex; align-items:center; justify-content:center; gap:0.25rem">
+            <span class="material-symbols-outlined" style="font-size:0.9rem">lock</span>
+            Thanh toán an toàn &amp; bảo mật
+        </p>
+    </div>
+    
+    {% else %}
+    <!-- EMPTY -->
+    <div class="empty-cart">
+        <div class="icon"></div>
+        <h2>Giỏ hàng trống</h2>
+        <p>Bạn chưa có sản phẩm nào trong giỏ hàng.</p>
+        <a href="{{ url_for('products') }}" class="btn btn-primary" style="display:inline-flex">
+            Bắt đầu mua sắm
+            <span class="material-symbols-outlined" style="font-size:1rem">arrow_forward</span>
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

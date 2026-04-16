@@ -1,0 +1,448 @@
+{% extends 'base.html' %}
+{% block title %}Sản phẩm - UTH Store{% endblock %}
+
+{% block extra_styles %}
+<style>
+.products-page {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 2rem;
+    padding-top: 2.5rem;
+}
+
+/* BREADCRUMB */
+.breadcrumb {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 1.5rem 2rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.breadcrumb a { color: var(--text-muted); text-decoration: none; }
+.breadcrumb a:hover { color: var(--primary); }
+.breadcrumb .sep { color: var(--border); }
+.breadcrumb .current { color: var(--primary); font-weight: 600; }
+
+/* SIDEBAR */
+.sidebar {
+    position: sticky;
+    top: 90px;
+    height: fit-content;
+}
+
+.filter-card {
+    background: white;
+    border-radius: 16px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    margin-bottom: 1rem;
+}
+
+.filter-title {
+    font-weight: 700;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.filter-list { list-style: none; }
+
+.filter-list li {
+    margin-bottom: 0.5rem;
+}
+
+.filter-list a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    text-decoration: none;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    transition: all 0.2s;
+}
+
+.filter-list a:hover,
+.filter-list a.active {
+    background: rgba(10,92,54,0.08);
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.filter-list a.active::after {
+    content: '';
+    font-weight: 700;
+}
+
+.price-range {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.price-range input[type="range"] {
+    width: 100%;
+    accent-color: var(--primary);
+}
+
+.price-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+/* MAIN CONTENT */
+.products-main {
+    min-width: 0;
+}
+
+.toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    margin-bottom: 1.5rem;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.toolbar-count {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.toolbar-count strong { color: var(--text); }
+
+.sort-options {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.sort-options label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+
+.sort-select {
+    padding: 0.4rem 0.75rem;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-family: inherit;
+    outline: none;
+    cursor: pointer;
+    background: white;
+    transition: border-color 0.2s;
+}
+
+.sort-select:focus { border-color: var(--primary); }
+
+/* PRODUCT GRID */
+.product-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+}
+
+.product-card {
+    background: white;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    transition: all 0.3s;
+    position: relative;
+}
+
+.product-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.12);
+}
+
+.product-img-wrap {
+    position: relative;
+    aspect-ratio: 3/4;
+    overflow: hidden;
+    background: var(--surface2);
+}
+
+.product-img-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.5s;
+}
+
+.product-card:hover .product-img-wrap img {
+    transform: scale(1.06);
+}
+
+.product-badge {
+    position: absolute;
+    top: 0.75rem;
+    left: 0.75rem;
+    padding: 0.25rem 0.625rem;
+    border-radius: 50px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.badge-new { background: var(--primary); color: white; }
+.badge-sale { background: var(--red); color: white; }
+
+.product-actions {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 0.875rem;
+    background: linear-gradient(transparent, rgba(0,0,0,0.55));
+    transform: translateY(100%);
+    transition: transform 0.3s;
+}
+
+.product-card:hover .product-actions { transform: translateY(0); }
+
+.product-actions a {
+    display: block;
+    width: 100%;
+    padding: 0.625rem;
+    background: white;
+    color: var(--primary);
+    text-align: center;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.product-actions a:hover { background: var(--primary); color: white; }
+
+.product-info {
+    padding: 0.875rem 1rem 1rem;
+}
+
+.product-category {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--primary);
+    margin-bottom: 0.2rem;
+}
+
+.product-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text);
+    margin-bottom: 0.5rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.product-price {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.price-new {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--primary);
+}
+
+.price-old {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-decoration: line-through;
+}
+
+/* EMPTY */
+.no-products {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--text-muted);
+    grid-column: 1/-1;
+}
+
+.no-products .icon { font-size: 4rem; margin-bottom: 1rem; }
+
+/* PAGINATION */
+.pagination {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 2.5rem;
+}
+
+.page-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    border: 1.5px solid var(--border);
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+    cursor: pointer;
+    text-decoration: none;
+    color: var(--text);
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.page-btn.active,
+.page-btn:hover {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
+}
+
+@media (max-width: 1024px) {
+    .products-page { grid-template-columns: 1fr; }
+    .sidebar { position: static; display: none; }
+    .product-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 480px) {
+    .product-grid { grid-template-columns: 1fr; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- BREADCRUMB -->
+<div class="breadcrumb">
+    <a href="{{ url_for('index') }}">Trang chủ</a>
+    <span class="sep">›</span>
+    <span class="current">
+        {% if request.args.get('category') %}
+            {{ request.args.get('category') }}
+        {% elif request.args.get('sale') %}
+            Sale
+        {% elif request.args.get('q') %}
+            Kết quả: "{{ request.args.get('q') }}"
+        {% else %}
+            Tất cả sản phẩm
+        {% endif %}
+    </span>
+</div>
+
+<!-- MAIN -->
+<div class="products-page">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="filter-card">
+            <h3 class="filter-title">Danh mục</h3>
+            <ul class="filter-list">
+                <li><a href="{{ url_for('products') }}" {% if not request.args.get('category') and not request.args.get('sale') %}class="active"{% endif %}>Tất cả sản phẩm</a></li>
+                <li><a href="{{ url_for('products', category='Áo') }}" {% if request.args.get('category') == 'Áo' %}class="active"{% endif %}>Áo</a></li>
+                <li><a href="{{ url_for('products', category='Quần') }}" {% if request.args.get('category') == 'Quần' %}class="active"{% endif %}>Quần</a></li>
+                <li><a href="{{ url_for('products', category='Váy') }}" {% if request.args.get('category') == 'Váy' %}class="active"{% endif %}>Váy</a></li>
+                <li><a href="{{ url_for('products', category='Phụ kiện') }}" {% if request.args.get('category') == 'Phụ kiện' %}class="active"{% endif %}>Phụ kiện</a></li>
+                <li><a href="{{ url_for('products', sale='true') }}" {% if request.args.get('sale') %}class="active"{% endif %}>Sale</a></li>
+            </ul>
+        </div>
+        <div class="filter-card">
+            <h3 class="filter-title">Sắp xếp</h3>
+            <ul class="filter-list">
+                <li><a href="?{{ (request.query_string.decode().replace('&sort=price_asc','').replace('&sort=price_desc','').replace('sort=price_asc','').replace('sort=price_desc','').rstrip('&')) }}&sort=newest" {% if request.args.get('sort') == 'newest' or not request.args.get('sort') %}class="active"{% endif %}>Mới nhất</a></li>
+                <li><a href="?{{ (request.query_string.decode().replace('&sort=newest','').replace('&sort=price_desc','').replace('sort=newest','').replace('sort=price_desc','').rstrip('&')) }}&sort=price_asc" {% if request.args.get('sort') == 'price_asc' %}class="active"{% endif %}>Giá thấp → cao</a></li>
+                <li><a href="?{{ (request.query_string.decode().replace('&sort=newest','').replace('&sort=price_asc','').replace('sort=newest','').replace('sort=price_asc','').rstrip('&')) }}&sort=price_desc" {% if request.args.get('sort') == 'price_desc' %}class="active"{% endif %}>Giá cao → thấp</a></li>
+            </ul>
+        </div>
+    </aside>
+
+    <!-- PRODUCTS -->
+    <main class="products-main">
+        <div class="toolbar">
+            <p class="toolbar-count">
+                Hiển thị <strong>{{ products|length }}</strong> sản phẩm
+                {% if request.args.get('category') %} trong danh mục <strong>{{ request.args.get('category') }}</strong>{% endif %}
+            </p>
+            <div class="sort-options">
+                <label>Sắp xếp theo:</label>
+                <select class="sort-select" onchange="applySort(this.value)" id="sort-select">
+                    <option value="newest" {% if request.args.get('sort','newest')=='newest' %}selected{% endif %}>Mới nhất</option>
+                    <option value="price_asc" {% if request.args.get('sort')=='price_asc' %}selected{% endif %}>Giá tăng dần</option>
+                    <option value="price_desc" {% if request.args.get('sort')=='price_desc' %}selected{% endif %}>Giá giảm dần</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="product-grid">
+            {% if products %}
+                {% for product in products %}
+                <div class="product-card">
+                    <div class="product-img-wrap">
+                        <img src="{{ product.image_url }}" alt="{{ product.name }}" loading="lazy">
+                        {% if product.is_new %}
+                        <span class="product-badge badge-new">New</span>
+                        {% elif product.is_on_sale %}
+                        <span class="product-badge badge-sale">-{{ ((1 - product.price/product.old_price)*100)|int if product.old_price else 0 }}%</span>
+                        {% endif %}
+                        <div class="product-actions">
+                            <a href="{{ url_for('product_detail', product_id=product.id) }}">Xem chi tiết →</a>
+                        </div>
+                    </div>
+                    <div class="product-info">
+                        <p class="product-category">{{ product.category.name if product.category else 'UTH Store' }}</p>
+                        <h3 class="product-name">{{ product.name }}</h3>
+                        <div class="product-price">
+                            <span class="price-new">{{ "{:,.0f}".format(product.price) }}đ</span>
+                            {% if product.old_price %}
+                            <span class="price-old">{{ "{:,.0f}".format(product.old_price) }}đ</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+            <div class="no-products">
+                <div class="icon"><span class="material-symbols-outlined" style="font-size:1.1rem">search</span></div>
+                <p style="font-size:1.1rem; font-weight:600; margin-bottom:0.5rem">Không tìm thấy sản phẩm</p>
+                <p>Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm.</p>
+                <a href="{{ url_for('products') }}" class="btn btn-primary" style="margin-top:1rem; display:inline-flex">Xem tất cả</a>
+            </div>
+            {% endif %}
+        </div>
+    </main>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function applySort(val) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('sort', val);
+    window.location.href = url.toString();
+}
+</script>
+{% endblock %}

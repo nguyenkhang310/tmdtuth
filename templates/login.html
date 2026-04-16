@@ -1,0 +1,304 @@
+{% extends 'base.html' %}
+{% block title %}Đăng nhập - UTH Store{% endblock %}
+
+{% block extra_styles %}
+<style>
+.auth-page {
+    min-height: calc(100vh - 72px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    background: linear-gradient(135deg, #f0fdf4 0%, #fafaf9 50%, #fff7ed 100%);
+}
+
+.auth-card {
+    width: 100%;
+    max-width: 480px;
+    background: white;
+    border-radius: 24px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.auth-header {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    padding: 2.5rem 2rem;
+    text-align: center;
+    color: white;
+}
+
+.auth-header .logo {
+    display: block;
+    margin: 0 auto 1rem;
+    max-height: 56px;
+    filter: brightness(0) invert(1);
+}
+
+.auth-header h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+}
+
+.auth-header p {
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+.auth-tabs {
+    display: flex;
+    border-bottom: 2px solid var(--border);
+}
+
+.auth-tab {
+    flex: 1;
+    padding: 1rem;
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    border: none;
+    background: none;
+    color: var(--text-muted);
+    font-family: inherit;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.2s;
+}
+
+.auth-tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+}
+
+.auth-body { padding: 2rem; }
+
+.auth-form { display: none; }
+.auth-form.active { display: block; }
+
+.form-group {
+    margin-bottom: 1.25rem;
+}
+
+.form-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 0.5rem;
+}
+
+.form-input {
+    width: 100%;
+    padding: 0.8rem 1rem;
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    font-size: 0.9rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+    background: var(--surface2);
+}
+
+.form-input:focus {
+    border-color: var(--primary);
+    background: white;
+    box-shadow: 0 0 0 3px rgba(10,92,54,0.1);
+}
+
+.input-icon-wrap {
+    position: relative;
+}
+
+.input-icon {
+    position: absolute;
+    left: 0.9rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 1.1rem;
+}
+
+.input-icon-wrap .form-input {
+    padding-left: 2.75rem;
+}
+
+.remember-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+}
+
+.check-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+    color: var(--text-muted);
+}
+
+.check-label input { accent-color: var(--primary); }
+
+.forgot-link {
+    font-size: 0.875rem;
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.forgot-link:hover { text-decoration: underline; }
+
+.submit-btn {
+    width: 100%;
+    padding: 0.9rem;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.submit-btn:hover {
+    background: var(--primary-light);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(10,92,54,0.3);
+}
+
+.divider {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 1.5rem 0;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+.divider::before,
+.divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+}
+
+.terms-note {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-align: center;
+    margin-top: 1rem;
+    line-height: 1.6;
+}
+
+.terms-note a { color: var(--primary); text-decoration: none; font-weight: 600; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-card">
+        <div class="auth-header">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="UTH Store" class="logo">
+            <h1>Chào mừng trở lại</h1>
+            <p>Đăng nhập để mua sắm và theo dõi đơn hàng</p>
+        </div>
+        
+        <div class="auth-tabs">
+            <button class="auth-tab active" id="tab-login" onclick="switchTab('login')">Đăng nhập</button>
+            <button class="auth-tab" id="tab-register" onclick="switchTab('register')">Đăng ký</button>
+        </div>
+        
+        <div class="auth-body">
+            <!-- LOGIN FORM -->
+            <form class="auth-form active" id="form-login" action="{{ url_for('login') }}" method="POST">
+                <div class="form-group">
+                    <label class="form-label">Email hoặc Tên đăng nhập</label>
+                    <div class="input-icon-wrap">
+                        <span class="material-symbols-outlined input-icon">person</span>
+                        <input type="text" name="login_id" class="form-input" placeholder="Nhập email hoặc tên đăng nhập" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Mật khẩu</label>
+                    <div class="input-icon-wrap">
+                        <span class="material-symbols-outlined input-icon">lock</span>
+                        <input type="password" name="password" class="form-input" placeholder="Nhập mật khẩu" required>
+                    </div>
+                </div>
+                <div class="remember-row">
+                    <label class="check-label">
+                        <input type="checkbox" name="remember">
+                        Ghi nhớ đăng nhập
+                    </label>
+                    <a href="#" class="forgot-link">Quên mật khẩu?</a>
+                </div>
+                <button type="submit" class="submit-btn">
+                    <span class="material-symbols-outlined" style="font-size:1.1rem">login</span>
+                    Đăng nhập
+                </button>
+                <div class="terms-note">
+                    Tài khoản demo: <strong>admin / admin123</strong>
+                </div>
+            </form>
+            
+            <!-- REGISTER FORM -->
+            <form class="auth-form" id="form-register" action="{{ url_for('register') }}" method="POST">
+                <div class="form-group">
+                    <label class="form-label">Họ và tên</label>
+                    <div class="input-icon-wrap">
+                        <span class="material-symbols-outlined input-icon">badge</span>
+                        <input type="text" name="name" class="form-input" placeholder="Nhập họ và tên" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <div class="input-icon-wrap">
+                        <span class="material-symbols-outlined input-icon">email</span>
+                        <input type="email" name="email" class="form-input" placeholder="email@example.com" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Mật khẩu</label>
+                    <div class="input-icon-wrap">
+                        <span class="material-symbols-outlined input-icon">lock</span>
+                        <input type="password" name="password" class="form-input" placeholder="Tối thiểu 6 ký tự" required minlength="6">
+                    </div>
+                </div>
+                <button type="submit" class="submit-btn">
+                    <span class="material-symbols-outlined" style="font-size:1.1rem">person_add</span>
+                    Tạo tài khoản
+                </button>
+                <p class="terms-note">
+                    Bằng cách đăng ký, bạn đồng ý với
+                    <a href="{{ url_for('policy') }}">Điều khoản dịch vụ</a> của chúng tôi.
+                </p>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function switchTab(tab) {
+    document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+    document.getElementById('form-' + tab).classList.add('active');
+}
+
+// Auto switch to register if URL has #register
+if (window.location.hash === '#register') switchTab('register');
+</script>
+{% endblock %}

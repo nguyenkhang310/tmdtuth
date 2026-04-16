@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}UTH Store{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        :root {
+            --primary: #0a5c36;
+            --primary-light: #12734a;
+            --primary-dark: #063d24;
+            --gold: #c9a84c;
+            --gold-light: #e8c76d;
+            --bg: #fafaf9;
+            --surface: #ffffff;
+            --surface2: #f4f4f0;
+            --text: #1a1a1a;
+            --text-muted: #6b7280;
+            --border: #e5e7eb;
+            --red: #dc2626;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        
+        .font-display { font-family: 'Playfair Display', serif; }
+        
+        /* NAVBAR */
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(20px);
+            border-bottom: 3px solid var(--gold);
+            box-shadow: 0 2px 20px rgba(0,0,0,0.08);
+        }
+        
+        .navbar-inner {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            height: 72px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 2rem;
+        }
+        
+        .navbar-logo {
+            display: flex;
+            align-items: center;
+            text-decoration: none;
+            flex-shrink: 0;
+        }
+        
+        .navbar-logo img {
+            height: 48px;
+            width: auto;
+            object-fit: contain;
+        }
+        
+        .navbar-nav {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            list-style: none;
+        }
+        
+        .navbar-nav a {
+            display: block;
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            text-decoration: none;
+            border-radius: 8px;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        
+        .navbar-nav a:hover,
+        .navbar-nav a.active {
+            color: var(--primary);
+            background: rgba(10,92,54,0.08);
+        }
+        
+        .navbar-nav a.sale {
+            color: var(--red);
+            font-weight: 700;
+        }
+        
+        .navbar-nav a.sale:hover {
+            background: rgba(220,38,38,0.08);
+        }
+        
+        .navbar-search {
+            flex: 1;
+            max-width: 300px;
+            position: relative;
+        }
+        
+        .navbar-search input {
+            width: 100%;
+            padding: 0.5rem 1rem 0.5rem 2.5rem;
+            border: 1.5px solid var(--border);
+            border-radius: 50px;
+            font-size: 0.875rem;
+            font-family: inherit;
+            outline: none;
+            background: var(--surface2);
+            transition: all 0.2s;
+        }
+        
+        .navbar-search input:focus {
+            border-color: var(--primary);
+            background: white;
+            box-shadow: 0 0 0 3px rgba(10,92,54,0.1);
+        }
+        
+        .navbar-search-icon {
+            position: absolute;
+            left: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+        
+        .navbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-shrink: 0;
+        }
+        
+        .navbar-icon-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            text-decoration: none;
+            color: var(--text);
+            transition: all 0.2s;
+            position: relative;
+        }
+        
+        .navbar-icon-btn:hover {
+            background: var(--surface2);
+            color: var(--primary);
+        }
+        
+        .navbar-icon-btn .material-symbols-outlined {
+            font-size: 1.4rem;
+        }
+        
+        .navbar-user-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 0.75rem;
+            border-radius: 50px;
+            border: 1.5px solid var(--border);
+            text-decoration: none;
+            color: var(--text);
+            font-size: 0.8rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        
+        .navbar-user-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        
+        /* MAIN BODY PADDING */
+        .page-wrapper {
+            padding-top: 72px;
+            min-height: 100vh;
+        }
+        
+        /* FLASH MESSAGES */
+        .flash-container {
+            position: fixed;
+            top: 80px;
+            right: 1rem;
+            z-index: 900;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .flash-msg {
+            padding: 0.75rem 1.25rem;
+            border-radius: 10px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            max-width: 320px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            animation: slideIn 0.3s ease;
+        }
+        
+        .flash-msg.success { background: #d1fae5; color: #065f46; border-left: 4px solid #10b981; }
+        .flash-msg.error { background: #fee2e2; color: #dc2626; border-left: 4px solid #dc2626; }
+        .flash-msg.info { background: #dbeafe; color: #1e40af; border-left: 4px solid #3b82f6; }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        
+        /* FOOTER */
+        .footer {
+            background: #111827;
+            color: #9ca3af;
+            padding: 4rem 0 2rem;
+        }
+        
+        .footer-inner {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr;
+            gap: 3rem;
+        }
+        
+        .footer-brand h3 {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 1rem;
+        }
+        
+        .footer-brand p {
+            font-size: 0.875rem;
+            line-height: 1.7;
+            margin-bottom: 1.5rem;
+        }
+        
+        .footer-social {
+            display: flex;
+            gap: 0.75rem;
+        }
+        
+        .footer-social a {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: 1px solid #374151;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #9ca3af;
+            text-decoration: none;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+        }
+        
+        .footer-social a:hover {
+            border-color: var(--gold);
+            color: var(--gold);
+        }
+        
+        .footer-col h4 {
+            color: white;
+            font-weight: 600;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 1.25rem;
+        }
+        
+        .footer-col ul { list-style: none; }
+        
+        .footer-col ul li {
+            margin-bottom: 0.6rem;
+        }
+        
+        .footer-col ul li a {
+            color: #9ca3af;
+            text-decoration: none;
+            font-size: 0.875rem;
+            transition: color 0.2s;
+        }
+        
+        .footer-col ul li a:hover { color: var(--gold); }
+        
+        .footer-bottom {
+            max-width: 1400px;
+            margin: 3rem auto 0;
+            padding: 1.5rem 2rem 0;
+            border-top: 1px solid #1f2937;
+            text-align: center;
+            font-size: 0.8rem;
+        }
+        
+        /* BTN UTILITIES */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s;
+            border: none;
+            font-family: inherit;
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: var(--primary-light);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px rgba(10,92,54,0.3);
+        }
+        
+        .btn-outline {
+            background: transparent;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+        }
+        
+        .btn-outline:hover {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .btn-gold {
+            background: var(--gold);
+            color: #1a1a1a;
+        }
+        
+        .btn-gold:hover {
+            background: var(--gold-light);
+            transform: translateY(-1px);
+        }
+        
+        /* MATERIAL ICONS */
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        /* RESPONSIVE */
+        @media (max-width: 1024px) {
+            .navbar-nav { display: none; }
+            .footer-inner { grid-template-columns: 1fr 1fr; }
+        }
+        
+        @media (max-width: 640px) {
+            .footer-inner { grid-template-columns: 1fr; }
+            .navbar-search { display: none; }
+        }
+    </style>
+    {% block extra_styles %}{% endblock %}
+</head>
+<body>
+<!-- NAVBAR -->
+<nav class="navbar">
+    <div class="navbar-inner">
+        <a href="{{ url_for('index') }}" class="navbar-logo">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="UTH Store">
+        </a>
+        
+        <ul class="navbar-nav">
+            <li><a href="{{ url_for('products', category='Áo') }}" {% if request.args.get('category') == 'Áo' %}class="active"{% endif %}>Áo</a></li>
+            <li><a href="{{ url_for('products', category='Quần') }}" {% if request.args.get('category') == 'Quần' %}class="active"{% endif %}>Quần</a></li>
+            <li><a href="{{ url_for('products', category='Váy') }}" {% if request.args.get('category') == 'Váy' %}class="active"{% endif %}>Váy</a></li>
+            <li><a href="{{ url_for('products', category='Phụ kiện') }}" {% if request.args.get('category') == 'Phụ kiện' %}class="active"{% endif %}>Phụ kiện</a></li>
+            <li><a href="{{ url_for('products', sale='true') }}" class="sale{% if request.args.get('sale') %} active{% endif %}">Sale</a></li>
+        </ul>
+        
+        <form action="{{ url_for('products') }}" method="GET" class="navbar-search">
+            <span class="material-symbols-outlined navbar-search-icon">search</span>
+            <input type="text" name="q" placeholder="Tìm kiếm sản phẩm..." value="{{ request.args.get('q', '') }}">
+        </form>
+        
+        <div class="navbar-actions">
+            <a href="{{ url_for('cart') }}" class="navbar-icon-btn" title="Giỏ hàng">
+                <span class="material-symbols-outlined">shopping_cart</span>
+            </a>
+            
+            {% if current_user.is_authenticated %}
+                {% if current_user.role == 'admin' %}
+                    <a href="{{ url_for('admin_dashboard') }}" class="navbar-icon-btn" title="Admin">
+                        <span class="material-symbols-outlined">admin_panel_settings</span>
+                    </a>
+                {% endif %}
+                <a href="{{ url_for('logout') }}" class="navbar-user-btn">
+                    <span class="material-symbols-outlined" style="font-size:1rem">logout</span>
+                    Đăng xuất
+                </a>
+            {% else %}
+                <a href="{{ url_for('login') }}" class="navbar-user-btn">
+                    <span class="material-symbols-outlined" style="font-size:1rem">person</span>
+                    Đăng nhập
+                </a>
+            {% endif %}
+        </div>
+    </div>
+</nav>
+
+<!-- FLASH MESSAGES -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flash-container">
+        {% for category, message in messages %}
+        <div class="flash-msg {{ category }}">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+{% endwith %}
+
+<!-- PAGE CONTENT -->
+<div class="page-wrapper">
+    {% block content %}{% endblock %}
+</div>
+
+<!-- FOOTER -->
+<footer class="footer">
+    <div class="footer-inner">
+        <div class="footer-brand">
+            <h3>UTH Store</h3>
+            <p>Thương hiệu thời trang cao cấp dành cho thế hệ năng động, hiện đại và luôn muốn thể hiện phong cách riêng.</p>
+            <div class="footer-social">
+                <a href="#" title="Facebook">f</a>
+                <a href="#" title="Instagram">ig</a>
+                <a href="#" title="TikTok">tk</a>
+            </div>
+        </div>
+        <div class="footer-col">
+            <h4>Sản phẩm</h4>
+            <ul>
+                <li><a href="{{ url_for('products', category='Áo') }}">Áo</a></li>
+                <li><a href="{{ url_for('products', category='Quần') }}">Quần</a></li>
+                <li><a href="{{ url_for('products', category='Váy') }}">Váy</a></li>
+                <li><a href="{{ url_for('products', category='Phụ kiện') }}">Phụ kiện</a></li>
+                <li><a href="{{ url_for('products', sale='true') }}">Sale</a></li>
+            </ul>
+        </div>
+        <div class="footer-col">
+            <h4>Hỗ trợ</h4>
+            <ul>
+                <li><a href="{{ url_for('contact') }}">Liên hệ</a></li>
+                <li><a href="{{ url_for('policy') }}">Chính sách đổi trả</a></li>
+                <li><a href="{{ url_for('policy') }}">Bảo hành</a></li>
+                <li><a href="{{ url_for('policy') }}">Vận chuyển</a></li>
+            </ul>
+        </div>
+        <div class="footer-col">
+            <h4>Liên hệ</h4>
+            <ul>
+                <li><span class="material-symbols-outlined" style="font-size:1.1rem">location_on</span> TP. Hồ Chí Minh</li>
+                <li><span class="material-symbols-outlined" style="font-size:1.1rem">phone</span> 0123 456 789</li>
+                <li><span class="material-symbols-outlined" style="font-size:1.1rem">email</span> contact@uthstore.vn</li>
+            </ul>
+        </div>
+    </div>
+    <div class="footer-bottom">
+        <p>© 2026 UTH Store. Tất cả quyền được bảo lưu.</p>
+    </div>
+</footer>
+
+<script>
+// Auto-dismiss flash messages
+setTimeout(() => {
+    document.querySelectorAll('.flash-msg').forEach(el => {
+        el.style.transition = 'all 0.3s';
+        el.style.opacity = '0';
+        el.style.transform = 'translateX(20px)';
+        setTimeout(() => el.remove(), 300);
+    });
+}, 4000);
+</script>
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>

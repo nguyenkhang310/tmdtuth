@@ -1,0 +1,590 @@
+{% extends 'base.html' %}
+{% block title %}{{ product.name }} - UTH Store{% endblock %}
+
+{% block extra_styles %}
+<style>
+.detail-page {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    margin-bottom: 2rem;
+}
+
+.breadcrumb a { color: var(--text-muted); text-decoration: none; }
+.breadcrumb a:hover { color: var(--primary); }
+.breadcrumb .sep { color: var(--border); }
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4rem;
+    align-items: start;
+}
+
+/* GALLERY */
+.gallery-main {
+    border-radius: 20px;
+    overflow: hidden;
+    aspect-ratio: 3/4;
+    background: var(--surface2);
+}
+
+.gallery-main img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* PRODUCT INFO */
+.product-info {
+    position: sticky;
+    top: 90px;
+}
+
+.product-category-tag {
+    display: inline-block;
+    padding: 0.3rem 0.875rem;
+    background: rgba(10,92,54,0.08);
+    color: var(--primary);
+    border-radius: 50px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 1rem;
+    text-decoration: none;
+}
+
+.product-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 2.25rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--text);
+    margin-bottom: 1rem;
+}
+
+.product-rating {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.stars {
+    color: #eab308;
+    font-size: 1rem;
+    letter-spacing: 0.05em;
+}
+
+.rating-text {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.price-section {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding: 1.5rem;
+    background: var(--surface2);
+    border-radius: 14px;
+}
+
+.price-current {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--primary);
+}
+
+.price-original {
+    font-size: 1.1rem;
+    color: var(--text-muted);
+    text-decoration: line-through;
+}
+
+.price-discount {
+    background: var(--red);
+    color: white;
+    padding: 0.2rem 0.75rem;
+    border-radius: 50px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.product-description {
+    color: var(--text-muted);
+    line-height: 1.8;
+    margin-bottom: 1.5rem;
+    font-size: 0.95rem;
+}
+
+.divider {
+    height: 1px;
+    background: var(--border);
+    margin: 1.5rem 0;
+}
+
+/* SIZE SELECT */
+.size-label {
+    font-size: 0.875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text);
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.size-grid {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+}
+
+.size-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    border: 2px solid var(--border);
+    background: white;
+    font-size: 0.875rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.size-btn:hover,
+.size-btn.active {
+    border-color: var(--primary);
+    background: var(--primary);
+    color: white;
+}
+
+/* QTY */
+.qty-section {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.qty-label {
+    font-size: 0.875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.qty-control {
+    display: flex;
+    align-items: center;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.qty-btn {
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: var(--surface2);
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.qty-btn:hover { background: var(--border); }
+
+.qty-input {
+    width: 56px;
+    height: 40px;
+    border: none;
+    text-align: center;
+    font-size: 1rem;
+    font-weight: 700;
+    font-family: inherit;
+    outline: none;
+}
+
+/* ACTIONS */
+.action-btns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+/* POLICIES */
+.policies {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.policy-item {
+    text-align: center;
+    padding: 1rem;
+    background: var(--surface2);
+    border-radius: 12px;
+}
+
+.policy-icon { font-size: 1.5rem; margin-bottom: 0.5rem; }
+.policy-name { font-size: 0.75rem; font-weight: 700; color: var(--text); }
+
+/* REVIEWS SECTION */
+.reviews-section {
+    max-width: 1200px;
+    margin: 3rem auto;
+    padding: 0 2rem;
+}
+
+.reviews-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 2rem;
+}
+
+.review-card {
+    background: white;
+    border-radius: 14px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.review-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.review-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+
+.reviewer-name { font-weight: 700; font-size: 0.95rem; }
+.reviewer-date { font-size: 0.8rem; color: var(--text-muted); }
+
+.review-stars { color: #eab308; font-size: 0.875rem; margin-bottom: 0.5rem; }
+
+.review-text { color: var(--text-muted); font-size: 0.9rem; line-height: 1.6; }
+
+/* ADD REVIEW FORM */
+.review-form {
+    background: white;
+    border-radius: 16px;
+    padding: 2rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    margin-top: 2rem;
+}
+
+.form-group {
+    margin-bottom: 1.25rem;
+}
+
+.form-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: var(--text);
+}
+
+.form-input,
+.form-textarea {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    font-size: 0.925rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.form-input:focus,
+.form-textarea:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(10,92,54,0.1);
+}
+
+.form-textarea { resize: vertical; min-height: 120px; }
+
+.star-picker {
+    display: flex;
+    gap: 0.5rem;
+    font-size: 1.5rem;
+    cursor: pointer;
+}
+
+.star-picker .star {
+    cursor: pointer;
+    transition: transform 0.1s;
+    color: #d1d5db;
+}
+
+.star-picker .star:hover,
+.star-picker .star.active {
+    color: #eab308;
+    transform: scale(1.15);
+}
+
+@media (max-width: 768px) {
+    .detail-grid { grid-template-columns: 1fr; gap: 2rem; }
+    .product-info { position: static; }
+    .action-btns { grid-template-columns: 1fr; }
+    .policies { grid-template-columns: 1fr; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="detail-page">
+    <!-- BREADCRUMB -->
+    <nav class="breadcrumb">
+        <a href="{{ url_for('index') }}">Trang chủ</a>
+        <span class="sep">›</span>
+        <a href="{{ url_for('products') }}">Sản phẩm</a>
+        <span class="sep">›</span>
+        <a href="{{ url_for('products', category=product.category.name) }}">{{ product.category.name }}</a>
+        <span class="sep">›</span>
+        <span>{{ product.name }}</span>
+    </nav>
+
+    <!-- DETAIL -->
+    <div class="detail-grid">
+        <!-- GALLERY -->
+        <div>
+            <div class="gallery-main">
+                <img src="{{ product.image_url }}" alt="{{ product.name }}">
+            </div>
+        </div>
+
+        <!-- INFO -->
+        <div class="product-info">
+            <a href="{{ url_for('products', category=product.category.name) }}" class="product-category-tag">{{ product.category.name }}</a>
+            
+            <h1 class="product-title">{{ product.name }}</h1>
+            
+            <div class="product-rating">
+                <div class="stars" style="display:flex; gap:2px; align-items:center">
+                    <span class="material-symbols-outlined" style="font-size:1.1rem; color:#eab308; font-variation-settings:'FILL' 1,'wght' 700,'GRAD' 0,'opsz' 24">star</span>
+                    <span class="material-symbols-outlined" style="font-size:1.1rem; color:#eab308; font-variation-settings:'FILL' 1,'wght' 700,'GRAD' 0,'opsz' 24">star</span>
+                    <span class="material-symbols-outlined" style="font-size:1.1rem; color:#eab308; font-variation-settings:'FILL' 1,'wght' 700,'GRAD' 0,'opsz' 24">star</span>
+                    <span class="material-symbols-outlined" style="font-size:1.1rem; color:#eab308; font-variation-settings:'FILL' 1,'wght' 700,'GRAD' 0,'opsz' 24">star</span>
+                    <span class="material-symbols-outlined" style="font-size:1.1rem; color:#eab308; font-variation-settings:'FILL' 1,'wght' 700,'GRAD' 0,'opsz' 24">star</span>
+                </div>
+                <span class="rating-text">{{ reviews|length }} đánh giá</span>
+            </div>
+            
+            <div class="price-section">
+                <span class="price-current">{{ "{:,.0f}".format(product.price) }}đ</span>
+                {% if product.old_price %}
+                <span class="price-original">{{ "{:,.0f}".format(product.old_price) }}đ</span>
+                <span class="price-discount">-{{ ((1 - product.price/product.old_price)*100)|int }}%</span>
+                {% endif %}
+            </div>
+            
+            <p class="product-description">{{ product.description or 'Sản phẩm chất lượng cao từ UTH Store.' }}</p>
+            
+            <div class="divider"></div>
+            
+            <!-- SIZE -->
+            <div>
+                <div class="size-label">
+                    <span>Kích thước</span>
+                    <a href="#" style="font-size:0.8rem; color:var(--primary); text-decoration:none; font-weight:400">Bảng size →</a>
+                </div>
+                <div class="size-grid">
+                    {% for size in ['XS', 'S', 'M', 'L', 'XL', 'XXL'] %}
+                    <button class="size-btn {% if size == 'M' %}active{% endif %}" onclick="selectSize(this)">{{ size }}</button>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <!-- QUANTITY -->
+            <div class="qty-section">
+                <span class="qty-label">Số lượng:</span>
+                <div class="qty-control">
+                    <button class="qty-btn" onclick="adjustQty(-1)">−</button>
+                    <input type="number" class="qty-input" id="qty" value="1" min="1" max="99">
+                    <button class="qty-btn" onclick="adjustQty(1)">+</button>
+                </div>
+            </div>
+            
+            <!-- ACTION BUTTONS -->
+            <div class="action-btns">
+                {% if current_user.is_authenticated %}
+                <form action="{{ url_for('add_to_cart', product_id=product.id) }}" method="POST" id="add-cart-form">
+                    <input type="hidden" name="quantity" id="cart-qty" value="1">
+                    <button type="submit" class="btn btn-outline" style="width:100%">
+                        <span class="material-symbols-outlined" style="font-size:1.1rem">shopping_bag</span>
+                        Thêm vào giỏ
+                    </button>
+                </form>
+                <form action="{{ url_for('add_to_cart', product_id=product.id) }}" method="POST" id="buy-now-form">
+                    <input type="hidden" name="quantity" id="buy-qty" value="1">
+                    <button type="submit" class="btn btn-primary" style="width:100%">
+                        Mua ngay
+                    </button>
+                </form>
+                {% else %}
+                <a href="{{ url_for('login') }}" class="btn btn-outline">
+                    <span class="material-symbols-outlined" style="font-size:1.1rem">shopping_bag</span>
+                    Đăng nhập để mua
+                </a>
+                <a href="{{ url_for('login') }}" class="btn btn-primary">
+                    Mua ngay 
+                </a>
+                {% endif %}
+            </div>
+            
+            <!-- POLICIES -->
+            <div class="policies">
+                <div class="policy-item">
+                    <div class="policy-icon"><span class="material-symbols-outlined" style="font-size:1.1rem">autorenew</span></div>
+                    <div class="policy-name">Đổi size miễn phí</div>
+                </div>
+                <div class="policy-item">
+                    <div class="policy-icon"><span class="material-symbols-outlined" style="font-size:1.1rem">shield</span></div>
+                    <div class="policy-name">Hoàn tiền 30 ngày</div>
+                </div>
+                <div class="policy-item">
+                    <div class="policy-icon"><span class="material-symbols-outlined" style="font-size:1.1rem">local_shipping</span></div>
+                    <div class="policy-name">Ship toàn quốc</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- REVIEWS -->
+<div class="reviews-section">
+    <h2 class="reviews-title">Đánh giá sản phẩm ({{ reviews|length }})</h2>
+    
+    {% for review in reviews %}
+    <div class="review-card">
+        <div class="review-header">
+            <div class="review-avatar">{{ review.user.username[0].upper() }}</div>
+            <div>
+                <div class="reviewer-name">{{ review.user.username }}</div>
+                <div class="reviewer-date">{{ review.created_at.strftime('%d/%m/%Y') }}</div>
+            </div>
+        </div>
+        <div class="review-stars" style="display:flex; gap:2px; margin-bottom:0.5rem">
+            {% for i in range(review.rating) %}
+            <span class="material-symbols-outlined" style="font-size:1rem; color:#eab308; font-variation-settings:'FILL' 1,'wght' 700,'GRAD' 0,'opsz' 24">star</span>
+            {% endfor %}
+            {% for i in range(5 - review.rating) %}
+            <span class="material-symbols-outlined" style="font-size:1rem; color:#d1d5db">star</span>
+            {% endfor %}
+        </div>
+        <p class="review-text">{{ review.comment }}</p>
+    </div>
+    {% endfor %}
+    
+    {% if not reviews %}
+    <div style="text-align:center; padding:2rem; color:var(--text-muted); background:white; border-radius:14px">
+        <span class="material-symbols-outlined" style="font-size:3rem; color:var(--border)">chat_bubble_outline</span>
+        <p style="margin-top:0.75rem">Chưa có đánh giá nào. Hãy là người đánh giá đầu tiên!</p>
+    </div>
+    {% endif %}
+    
+    <!-- REVIEW FORM -->
+    {% if current_user.is_authenticated %}
+    <div class="review-form">
+        <h3 style="font-weight:700; font-size:1.1rem; margin-bottom:1.5rem">Viết đánh giá của bạn</h3>
+        <form action="{{ url_for('add_review', product_id=product.id) }}" method="POST">
+            <div class="form-group">
+                <label class="form-label">Xếp hạng</label>
+                <div class="star-picker" id="star-picker">
+                    {% for i in range(1, 6) %}
+                    <span class="material-symbols-outlined star" data-val="{{ i }}" onclick="setRating({{ i }})" style="font-size:2rem; cursor:pointer; color:#d1d5db; transition:color 0.15s">star</span>
+                    {% endfor %}
+                </div>
+                <input type="hidden" name="rating" id="rating-input" value="5">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Nhận xét</label>
+                <textarea name="comment" class="form-textarea" placeholder="Chia sẻ trải nghiệm của bạn về sản phẩm này..." required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">
+                Gửi đánh giá
+                <span class="material-symbols-outlined" style="font-size:1rem">send</span>
+            </button>
+        </form>
+    </div>
+    {% else %}
+    <div style="text-align:center; padding:1.5rem; border:2px dashed var(--border); border-radius:14px; margin-top:1rem">
+        <p style="color:var(--text-muted)">
+            <a href="{{ url_for('login') }}" style="color:var(--primary); font-weight:600">Đăng nhập</a> để viết đánh giá.
+        </p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function selectSize(btn) {
+    document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+}
+
+function adjustQty(delta) {
+    const input = document.getElementById('qty');
+    const qtyCart = document.getElementById('cart-qty');
+    const qtyBuy = document.getElementById('buy-qty');
+    let val = parseInt(input.value) + delta;
+    if (val < 1) val = 1;
+    if (val > 99) val = 99;
+    input.value = val;
+    if (qtyCart) qtyCart.value = val;
+    if (qtyBuy) qtyBuy.value = val;
+}
+
+function setRating(val) {
+    document.getElementById('rating-input').value = val;
+    document.querySelectorAll('#star-picker .star').forEach((s, i) => {
+        s.style.color = i < val ? '#eab308' : '#d1d5db';
+        s.style.fontVariationSettings = i < val
+            ? "'FILL' 1,'wght' 700,'GRAD' 0,'opsz' 24"
+            : "'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24";
+    });
+}
+
+// Initialize stars at 5
+setRating(5);
+</script>
+{% endblock %}

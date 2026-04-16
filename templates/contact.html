@@ -1,0 +1,272 @@
+{% extends 'base.html' %}
+{% block title %}Liên hệ - UTH Store{% endblock %}
+
+{% block extra_styles %}
+<style>
+.contact-hero {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    color: white;
+    padding: 4rem 0;
+    text-align: center;
+}
+
+.contact-hero h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 3rem;
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+}
+
+.contact-hero p {
+    font-size: 1.1rem;
+    opacity: 0.85;
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.contact-page {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 4rem 2rem;
+    display: grid;
+    grid-template-columns: 1fr 1.5fr;
+    gap: 3rem;
+    align-items: start;
+}
+
+/* INFO CARDS */
+.info-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.info-card {
+    background: white;
+    border-radius: 16px;
+    padding: 1.5rem;
+    display: flex;
+    gap: 1.25rem;
+    align-items: flex-start;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    transition: transform 0.2s;
+}
+
+.info-card:hover { transform: translateY(-2px); }
+
+.info-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    flex-shrink: 0;
+}
+
+.info-card-content h3 {
+    font-weight: 700;
+    font-size: 1rem;
+    margin-bottom: 0.25rem;
+}
+
+.info-card-content p {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+}
+
+/* MAP */
+.map-card {
+    background: white;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    margin-top: 1rem;
+}
+
+.map-card iframe {
+    width: 100%;
+    height: 220px;
+    border: none;
+    display: block;
+}
+
+.map-card-info {
+    padding: 1rem 1.25rem;
+}
+
+.map-card-info h4 { font-weight: 700; margin-bottom: 0.25rem; }
+.map-card-info p { font-size: 0.875rem; color: var(--text-muted); }
+
+/* CONTACT FORM */
+.contact-form-card {
+    background: white;
+    border-radius: 20px;
+    padding: 2.5rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+}
+
+.contact-form-card h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.contact-form-card p {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin-bottom: 2rem;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.form-group {
+    margin-bottom: 1.25rem;
+}
+
+.form-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 0.5rem;
+}
+
+.form-input,
+.form-textarea,
+.form-select {
+    width: 100%;
+    padding: 0.8rem 1rem;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+    background: var(--surface2);
+}
+
+.form-input:focus,
+.form-textarea:focus,
+.form-select:focus {
+    border-color: var(--primary);
+    background: white;
+    box-shadow: 0 0 0 3px rgba(10,92,54,0.1);
+}
+
+.form-textarea {
+    resize: vertical;
+    min-height: 140px;
+}
+
+.form-select { cursor: pointer; }
+
+@media (max-width: 768px) {
+    .contact-page { grid-template-columns: 1fr; }
+    .contact-hero h1 { font-size: 2rem; }
+    .form-row { grid-template-columns: 1fr; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="contact-hero">
+    <h1>Liên hệ với chúng tôi</h1>
+    <p>Chúng tôi luôn sẵn sàng lắng nghe và hỗ trợ bạn 24/7</p>
+</div>
+
+<div class="contact-page">
+    <!-- LEFT: INFO -->
+    <div>
+        <div class="info-cards">
+            <div class="info-card">
+                <div class="info-icon" style="background:#d1fae5"><span class="material-symbols-outlined" style="font-size:1.1rem">location_on</span></div>
+                <div class="info-card-content">
+                    <h3>Địa chỉ</h3>
+                    <p>123 Đường Thời Trang, Quận 1, TP. Hồ Chí Minh</p>
+                </div>
+            </div>
+            <div class="info-card">
+                <div class="info-icon" style="background:#dbeafe"><span class="material-symbols-outlined" style="font-size:1.1rem">phone</span></div>
+                <div class="info-card-content">
+                    <h3>Điện thoại</h3>
+                    <p>0123 456 789 (8h - 22h mỗi ngày)</p>
+                </div>
+            </div>
+            <div class="info-card">
+                <div class="info-icon" style="background:#fce7f3"><span class="material-symbols-outlined" style="font-size:1.1rem">email</span></div>
+                <div class="info-card-content">
+                    <h3>Email</h3>
+                    <p>contact@uthstore.vn<br>support@uthstore.vn</p>
+                </div>
+            </div>
+            <div class="info-card">
+                <div class="info-icon" style="background:#fef3c7"><span class="material-symbols-outlined" style="font-size:1.1rem">schedule</span></div>
+                <div class="info-card-content">
+                    <h3>Giờ làm việc</h3>
+                    <p>Thứ 2 - Thứ 7: 8h - 22h<br>Chủ nhật: 9h - 20h</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- GOOGLE MAP -->
+        <div class="map-card">
+            <iframe
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3919.4486982022147!2d106.69805411533419!3d10.77618456228455!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x31752f4670702e31%3A0xa5777f642cf36e08!2zVHLGsOG7nW5nIENhbyDEkOG6s25nIFbDoCBuZ2hp4buHcCBUUC5IQ00!5e0!3m2!1svi!2svn!4v1650000000000!5m2!1svi!2svn"
+                allowfullscreen loading="lazy">
+            </iframe>
+            <div class="map-card-info">
+                <h4>UTH Store - Cửa hàng chính</h4>
+                <p>Gần Trường Đại học Giao thông Vận tải TP.HCM</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- RIGHT: FORM -->
+    <div class="contact-form-card">
+        <h2>Gửi tin nhắn cho chúng tôi</h2>
+        <p>Điền form bên dưới và chúng tôi sẽ phản hồi trong vòng 24 giờ.</p>
+        
+        <form action="{{ url_for('contact') }}" method="POST">
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Họ tên *</label>
+                    <input type="text" name="name" class="form-input" placeholder="Nguyễn Văn A" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email *</label>
+                    <input type="email" name="email" class="form-input" placeholder="email@example.com" required>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Chủ đề</label>
+                <select name="subject" class="form-select">
+                    <option value="order">Vấn đề đơn hàng</option>
+                    <option value="product">Hỏi về sản phẩm</option>
+                    <option value="return">Đổi trả hàng</option>
+                    <option value="payment">Thanh toán</option>
+                    <option value="other">Khác</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Nội dung *</label>
+                <textarea name="message" class="form-textarea" placeholder="Mô tả chi tiết vấn đề hoặc câu hỏi của bạn..." required></textarea>
+            </div>
+            
+            <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center">
+                <span class="material-symbols-outlined" style="font-size:1.1rem">send</span>
+                Gửi tin nhắn
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
