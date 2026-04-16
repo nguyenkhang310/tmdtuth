@@ -190,21 +190,21 @@
                 <div class="info-icon" style="background:#d1fae5"><span class="material-symbols-outlined" style="font-size:1.1rem">location_on</span></div>
                 <div class="info-card-content">
                     <h3>Địa chỉ</h3>
-                    <p>123 Đường Thời Trang, Quận 1, TP. Hồ Chí Minh</p>
+                    <p>{{ shop.address }}</p>
                 </div>
             </div>
             <div class="info-card">
                 <div class="info-icon" style="background:#dbeafe"><span class="material-symbols-outlined" style="font-size:1.1rem">phone</span></div>
                 <div class="info-card-content">
                     <h3>Điện thoại</h3>
-                    <p>0123 456 789 (8h - 22h mỗi ngày)</p>
+                    <p>{{ shop.phone_display }} (8h - 22h mỗi ngày)</p>
                 </div>
             </div>
             <div class="info-card">
                 <div class="info-icon" style="background:#fce7f3"><span class="material-symbols-outlined" style="font-size:1.1rem">email</span></div>
                 <div class="info-card-content">
                     <h3>Email</h3>
-                    <p>contact@uthstore.vn<br>support@uthstore.vn</p>
+                    <p>{{ shop.email }}<br>{{ shop.support_email }}</p>
                 </div>
             </div>
             <div class="info-card">
@@ -219,12 +219,12 @@
         <!-- GOOGLE MAP -->
         <div class="map-card">
             <iframe
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3919.4486982022147!2d106.69805411533419!3d10.77618456228455!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x31752f4670702e31%3A0xa5777f642cf36e08!2zVHLGsOG7nW5nIENhbyDEkOG6s25nIFbDoCBuZ2hp4buHcCBUUC5IQ00!5e0!3m2!1svi!2svn!4v1650000000000!5m2!1svi!2svn"
+                src="{{ shop.map_embed_url }}"
                 allowfullscreen loading="lazy">
             </iframe>
             <div class="map-card-info">
-                <h4>UTH Store - Cửa hàng chính</h4>
-                <p>Gần Trường Đại học Giao thông Vận tải TP.HCM</p>
+                <h4>{{ shop.name }} - Cửa hàng chính</h4>
+                <p>{{ shop.address }}</p>
             </div>
         </div>
     </div>
@@ -235,6 +235,7 @@
         <p>Điền form bên dưới và chúng tôi sẽ phản hồi trong vòng 24 giờ.</p>
         
         <form action="{{ url_for('contact') }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="form-row">
                 <div class="form-group">
                     <label class="form-label">Họ tên *</label>

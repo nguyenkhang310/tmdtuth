@@ -51,14 +51,66 @@ class CartItem(db.Model):
     
     product = db.relationship('Product')
 
+
+class WishlistItem(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', backref=db.backref('wishlist_items', lazy=True, cascade='all, delete-orphan'))
+    product = db.relationship('Product')
+
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'product_id', name='uq_wishlist_user_product'),
+    )
+
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     total_amount = db.Column(db.Float, nullable=False)
+    # Order lifecycle status (fulfillment)
     status = db.Column(db.String(50), default='pending') # pending, paid, shipped, delivered, cancelled
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Shipping/customer info (captured at checkout)
+    shipping_name = db.Column(db.String(150), nullable=True)
+    shipping_phone = db.Column(db.String(30), nullable=True)
+    shipping_address = db.Column(db.String(500), nullable=True)
+    note = db.Column(db.String(500), nullable=True)
+
+    # Payment info
+    payment_method = db.Column(db.String(50), default='COD')  # COD, BANK_TRANSFER, MOMO, VNPAY
+    payment_status = db.Column(db.String(50), default='unpaid')  # unpaid, initiated, paid, failed, cancelled
+    payment_ref = db.Column(db.String(200), nullable=True)  # gateway transaction ref
     
     items = db.relationship('OrderItem', backref='order', lazy=True, cascade='all, delete-orphan')
+
+class PaymentTransaction(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey('order.id'), nullable=False, index=True)
+    provider = db.Column(db.String(50), nullable=False)  # MOMO, VNPAY
+    amount = db.Column(db.Float, nullable=False)
+    status = db.Column(db.String(50), default='initiated')  # initiated, paid, failed, cancelled
+    provider_ref = db.Column(db.String(200), nullable=True)  # transactionId / vnp_TxnRef
+    raw_request = db.Column(db.Text, nullable=True)
+    raw_response = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    order = db.relationship('Order', backref=db.backref('transactions', lazy=True, cascade='all, delete-orphan'))
+
+
+class Coupon(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    coupon_type = db.Column(db.String(20), nullable=False, default='percent')  # percent, fixed, shipping
+    value = db.Column(db.Float, nullable=False, default=0)
+    min_subtotal = db.Column(db.Float, nullable=False, default=0)
+    is_active = db.Column(db.Boolean, default=True)
+    expires_at = db.Column(db.DateTime, nullable=True)
+    max_uses = db.Column(db.Integer, nullable=True)
+    used_count = db.Column(db.Integer, nullable=False, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class OrderItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)

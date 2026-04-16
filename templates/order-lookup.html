@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% block title %}Tra cứu đơn hàng - UTH Store{% endblock %}
+
+{% block extra_styles %}
+<style>
+.lookup-wrap{max-width:860px;margin:0 auto;padding:2.5rem 1rem;}
+.lookup-card{background:#fff;border-radius:16px;padding:1.5rem;box-shadow:0 4px 18px rgba(0,0,0,0.08);}
+.lookup-title{font-family:'Playfair Display',serif;font-size:2rem;font-weight:800;margin-bottom:0.5rem}
+.lookup-sub{color:var(--text-muted);margin-bottom:1.2rem}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:0.75rem}
+.input{width:100%;padding:0.75rem;border:1.5px solid var(--border);border-radius:10px;font-family:inherit}
+.input:focus{outline:none;border-color:var(--primary)}
+.row{margin-top:0.75rem}
+.result{margin-top:1rem;padding:1rem;border-radius:12px;background:#f8fafc}
+.timeline{display:grid;grid-template-columns:repeat(4,1fr);gap:0.5rem;margin-top:0.9rem}
+.step{padding:0.5rem;border-radius:10px;background:#eef2f7;text-align:center;font-size:0.75rem;font-weight:700;color:#6b7280}
+.step.done{background:#dcfce7;color:#166534}
+@media(max-width:768px){.grid{grid-template-columns:1fr}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="lookup-wrap">
+  <div class="lookup-card">
+    <div class="lookup-title">Tra cứu đơn hàng</div>
+    <div class="lookup-sub">Nhập mã đơn, email và số điện thoại nhận hàng để kiểm tra trạng thái.</div>
+    <form method="POST" action="{{ url_for('order_lookup') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="grid">
+        <input class="input" type="number" name="order_id" placeholder="Mã đơn (vd: 123)" required>
+        <input class="input" type="email" name="email" placeholder="Email đặt hàng" required>
+      </div>
+      <div class="row">
+        <input class="input" type="text" name="phone" placeholder="Số điện thoại nhận hàng" required>
+      </div>
+      <div class="row">
+        <button class="btn btn-primary" type="submit">Tra cứu</button>
+      </div>
+    </form>
+
+    {% if found_order %}
+    <div class="result">
+      <div><strong>Đơn #{{ found_order.id }}</strong></div>
+      <div>Khách hàng: {{ found_order.shipping_name }}</div>
+      <div>Tổng thanh toán: {{ "{:,.0f}".format(found_order.total_amount) }}đ</div>
+      <div>Trạng thái: {{ found_order.status }}</div>
+      <div>Thanh toán: {{ found_order.payment_status }}</div>
+      {% if status_steps %}
+      <div class="timeline">
+        {% for step in status_steps %}
+        <div class="step {% if step.done %}done{% endif %}">{{ step.label }}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      <div style="margin-top:0.75rem">
+        <a class="btn btn-outline" href="{{ url_for('login', next=url_for('order_detail', order_id=found_order.id)) }}">Đăng nhập để xem chi tiết</a>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+

@@ -254,6 +254,12 @@
     box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
 
+.product-card-link {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+}
+
 .product-card:hover {
     transform: translateY(-6px);
     box-shadow: 0 16px 40px rgba(0,0,0,0.12);
@@ -529,8 +535,8 @@
         <div class="hero-badge">
             Bộ sưu tập Xuân Hè 2026
         </div>
-        <h1>Phong cách <span>đẳng cấp</span><br>học đường</h1>
-        <p>Khám phá BST mới nhất từ UTH Store — nơi thời trang học thuật gặp gỡ phong cách đương đại.</p>
+        <h1>UTH Store: <span>Khẳng định</span><br>chất riêng</h1>
+        <p>Cập nhật những item mới nhất từ UTH Store để sẵn sàng tỏa sáng mỗi ngày đến trường.</p>
         <div class="hero-actions">
             <a href="{{ url_for('products') }}" class="btn btn-gold" style="font-size:1rem; padding:1rem 2rem">
                 Khám phá ngay
@@ -635,27 +641,26 @@
         <div class="product-grid">
             {% for product in new_products %}
             <div class="product-card">
-                <div class="product-img-wrap">
-                    <img src="{{ product.image_url }}" alt="{{ product.name }}" loading="lazy">
-                    {% if product.is_new %}
-                    <span class="product-badge badge-new">New</span>
-                    {% elif product.is_on_sale %}
-                    <span class="product-badge badge-sale">Sale</span>
-                    {% endif %}
-                    <div class="product-actions">
-                        <a href="{{ url_for('product_detail', product_id=product.id) }}" class="product-action-btn btn-view">Xem chi tiết</a>
-                    </div>
-                </div>
-                <div class="product-info">
-                    <p class="product-category">{{ product.category.name if product.category else 'UTH Store' }}</p>
-                    <h3 class="product-name">{{ product.name }}</h3>
-                    <div class="product-price">
-                        <span class="price-new">{{ "{:,.0f}".format(product.price) }}đ</span>
-                        {% if product.old_price %}
-                        <span class="price-old">{{ "{:,.0f}".format(product.old_price) }}đ</span>
+                <a class="product-card-link" href="{{ url_for('product_detail', product_id=product.id) }}" aria-label="{{ product.name }}">
+                    <div class="product-img-wrap">
+                        <img src="{{ product.image_url }}" alt="{{ product.name }}" loading="lazy">
+                        {% if product.is_new %}
+                        <span class="product-badge badge-new">New</span>
+                        {% elif product.is_on_sale %}
+                        <span class="product-badge badge-sale">Sale</span>
                         {% endif %}
                     </div>
-                </div>
+                    <div class="product-info">
+                        <p class="product-category">{{ product.category.name if product.category else 'UTH Store' }}</p>
+                        <h3 class="product-name">{{ product.name }}</h3>
+                        <div class="product-price">
+                            <span class="price-new">{{ "{:,.0f}".format(product.price) }}đ</span>
+                            {% if product.old_price %}
+                            <span class="price-old">{{ "{:,.0f}".format(product.old_price) }}đ</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </a>
             </div>
             {% endfor %}
         </div>

@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% block title %}Đơn hàng #{{ order.id }} - UTH Store{% endblock %}
+
+{% block extra_styles %}
+<style>
+.page{max-width:1100px;margin:0 auto;padding:2.5rem 2rem;}
+.grid{display:grid;grid-template-columns:1fr 360px;gap:2rem;align-items:start;}
+.card{background:#fff;border-radius:16px;padding:1.5rem;box-shadow:0 2px 8px rgba(0,0,0,0.06);}
+.h{font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:900;margin-bottom:0.25rem;}
+.muted{color:var(--text-muted);}
+.row{display:flex;justify-content:space-between;gap:1rem;margin:0.5rem 0;}
+.tag{display:inline-block;padding:0.25rem 0.6rem;border-radius:999px;font-size:0.72rem;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;}
+.tag.yellow{background:#fef3c7;color:#92400e;}
+.tag.blue{background:#dbeafe;color:#1e40af;}
+.tag.green{background:#d1fae5;color:#065f46;}
+.tag.red{background:#fee2e2;color:#dc2626;}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:0.5rem;padding:0.9rem 1rem;border-radius:12px;font-weight:800;border:none;cursor:pointer;text-decoration:none;font-family:inherit;}
+.btn.primary{background:var(--primary);color:#fff;}
+.btn.primary:hover{background:var(--primary-light);}
+.btn.outline{background:#fff;color:var(--primary);border:2px solid var(--primary);}
+.btn.outline:hover{background:rgba(10,92,54,0.06);}
+.summary{position:sticky;top:90px;}
+pre{white-space:pre-wrap;background:var(--surface2);border-radius:12px;padding:1rem;border:1.5px solid var(--border);font-size:0.85rem;}
+@media (max-width: 900px){.grid{grid-template-columns:1fr;}.summary{position:static;}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page">
+  <div class="card" style="margin-bottom:1.5rem">
+    <div class="h">Đơn hàng #{{ order.id }}</div>
+    <div class="muted">Tạo lúc {{ order.created_at.strftime('%d/%m/%Y %H:%M') }}</div>
+    <div style="margin-top:0.75rem;display:flex;gap:0.5rem;flex-wrap:wrap">
+      {% if order.status == 'pending' %}<span class="tag yellow">Chờ xử lý</span>
+      {% elif order.status == 'paid' %}<span class="tag blue">Đã thanh toán</span>
+      {% elif order.status == 'shipped' %}<span class="tag blue">Đang giao</span>
+      {% elif order.status == 'delivered' %}<span class="tag green">Hoàn thành</span>
+      {% elif order.status == 'cancelled' %}<span class="tag red">Đã huỷ</span>
+      {% endif %}
+
+      {% if order.payment_status == 'paid' %}<span class="tag green">Payment: Paid</span>
+      {% elif order.payment_status == 'initiated' %}<span class="tag yellow">Payment: Initiated</span>
+      {% elif order.payment_status == 'unpaid' %}<span class="tag yellow">Payment: Unpaid</span>
+      {% elif order.payment_status == 'failed' %}<span class="tag red">Payment: Failed</span>
+      {% elif order.payment_status == 'cancelled' %}<span class="tag red">Payment: Cancelled</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div style="font-weight:900;margin-bottom:0.75rem">Thông tin nhận hàng</div>
+      <div class="row"><span class="muted">Họ tên</span><span style="font-weight:800">{{ order.shipping_name or '—' }}</span></div>
+      <div class="row"><span class="muted">SĐT</span><span style="font-weight:800">{{ order.shipping_phone or '—' }}</span></div>
+      <div class="row"><span class="muted">Địa chỉ</span><span style="font-weight:800;text-align:right">{{ order.shipping_address or '—' }}</span></div>
+      {% if order.note %}
+      <div style="margin-top:0.75rem">
+        <div class="muted" style="font-size:0.85rem;font-weight:700;margin-bottom:0.35rem">Ghi chú</div>
+        <div style="font-weight:600">{{ order.note }}</div>
+      </div>
+      {% endif %}
+
+      <div style="height:1px;background:var(--border);margin:1.25rem 0"></div>
+      <div style="font-weight:900;margin-bottom:0.75rem">Sản phẩm</div>
+      {% for it in order.items %}
+        <div class="row">
+          <span class="muted">{{ it.product.name if it.product else ('#'+it.product_id|string) }} × {{ it.quantity }}</span>
+          <span style="font-weight:800">{{ "{:,.0f}".format(it.price * it.quantity) }}đ</span>
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="card summary">
+      <div style="font-weight:900;margin-bottom:0.75rem">Thanh toán</div>
+      <div class="row"><span class="muted">Phương thức</span><span style="font-weight:900">{{ order.payment_method }}</span></div>
+      <div class="row"><span class="muted">Tổng tiền</span><span style="font-weight:900;color:var(--primary)">{{ "{:,.0f}".format(order.total_amount) }}đ</span></div>
+
+      {% if order.payment_method == 'COD' %}
+        <div style="margin-top:1rem" class="muted">Bạn sẽ thanh toán bằng tiền mặt khi nhận hàng.</div>
+        <a class="btn outline" style="margin-top:1rem;width:100%" href="{{ url_for('products') }}">Tiếp tục mua sắm</a>
+      {% elif order.payment_method == 'BANK_TRANSFER' %}
+        <div style="margin-top:1rem" class="muted">Vui lòng chuyển khoản theo thông tin dưới đây. Nội dung chuyển khoản nên ghi <strong>UTH{{ order.id }}</strong>.</div>
+        <pre style="margin-top:0.75rem">{{ bank_info.replace('{{order_id}}', order.id|string) }}</pre>
+        <a class="btn outline" style="margin-top:1rem;width:100%" href="{{ url_for('products') }}">Tiếp tục mua sắm</a>
+      {% elif order.payment_method == 'MOMO' %}
+        <div style="margin-top:1rem" class="muted">Bấm nút bên dưới để thanh toán qua MoMo.</div>
+        <a class="btn primary" style="margin-top:1rem;width:100%" href="{{ url_for('momo_create', order_id=order.id) }}">Thanh toán MoMo</a>
+      {% elif order.payment_method == 'VNPAY' %}
+        <div style="margin-top:1rem" class="muted">Bấm nút bên dưới để thanh toán qua VNPAY.</div>
+        <a class="btn primary" style="margin-top:1rem;width:100%" href="{{ url_for('vnpay_create', order_id=order.id) }}">Thanh toán VNPAY</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+

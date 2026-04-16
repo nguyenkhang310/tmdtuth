@@ -252,14 +252,17 @@
                 <div class="cart-item-meta">{{ item.product.category.name if item.product.category else 'UTH Store' }}</div>
                 <div class="cart-item-price">{{ "{:,.0f}".format(item.product.price) }}đ</div>
             </div>
-            <div class="cart-item-qty">
-                <button>−</button>
-                <input type="number" value="{{ item.quantity }}" min="1">
-                <button>+</button>
+            <div class="cart-item-qty" data-item-id="{{ item.id }}">
+                <button type="button" class="qty-btn" data-delta="-1">−</button>
+                <input type="number" class="qty-input" value="{{ item.quantity }}" min="1">
+                <button type="button" class="qty-btn" data-delta="1">+</button>
             </div>
-            <a href="{{ url_for('remove_from_cart', item_id=item.id) }}" class="cart-item-remove" title="Xóa">
-                <span class="material-symbols-outlined">delete</span>
-            </a>
+            <form method="POST" action="{{ url_for('remove_from_cart', item_id=item.id) }}" style="margin:0">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="cart-item-remove" title="Xóa" style="border:none;background:none">
+                    <span class="material-symbols-outlined">delete</span>
+                </button>
+            </form>
         </div>
         {% endfor %}
         
@@ -275,31 +278,33 @@
     <div class="cart-summary">
         <h2 class="summary-title">Tóm tắt đơn hàng</h2>
         
-        {% set total = namespace(val=0) %}
-        {% for item in cart.items %}
-            {% set total.val = total.val + (item.product.price * item.quantity) %}
-        {% endfor %}
-        
         <div class="summary-row">
-            <span class="label">Tạm tính ({{ cart.itemslength }} sản phẩm)</span>
-            <span class="value">{{ "{:,.0f}".format(total.val) }}đ</span>
+            <span class="label">Tạm tính ({{ totals.item_count if totals else cart.items|length }} sản phẩm)</span>
+            <span class="value">{{ "{:,.0f}".format(totals.subtotal if totals else 0) }}đ</span>
         </div>
         <div class="summary-row">
             <span class="label">Phí vận chuyển</span>
-            <span class="value" style="color:var(--primary)">{% if total.val >= 500000 %}Miễn phí{% else %}30.000đ{% endif %}</span>
+            <span class="value" style="color:var(--primary)">{{ "{:,.0f}".format(totals.shipping_fee if totals else 0) }}đ</span>
         </div>
-        
-        <div class="promo-input">
-            <input type="text" placeholder="Mã khuyến mại">
-            <button>Áp dụng</button>
+        {% if totals and totals.discount > 0 %}
+        <div class="summary-row">
+            <span class="label">Giảm giá {% if totals.applied_coupon %}({{ totals.applied_coupon }}){% endif %}</span>
+            <span class="value" style="color:#10b981">-{{ "{:,.0f}".format(totals.discount) }}đ</span>
         </div>
+        {% endif %}
+
+        <form class="promo-input" method="POST" action="{{ url_for('apply_coupon') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="text" name="coupon_code" placeholder="Mã khuyến mại" value="{{ totals.applied_coupon if totals and totals.applied_coupon else '' }}">
+            <button type="submit">Áp dụng</button>
+        </form>
         
         <div class="summary-total">
             <span class="label">Tổng cộng</span>
-            <span class="value">{{ "{:,.0f}".format(total.val + (0 if total.val >= 500000 else 30000)) }}đ</span>
+            <span class="value">{{ "{:,.0f}".format(totals.grand_total if totals else 0) }}đ</span>
         </div>
         
-        <a href="#" class="checkout-btn">
+        <a href="{{ url_for('checkout') }}" class="checkout-btn">
             Thanh toán ngay 
         </a>
         
@@ -328,4 +333,51 @@
     </div>
     {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const csrfToken = "{{ csrf_token() }}";
+
+async function setQty(itemId, qty) {
+  const res = await fetch(`/cart/item/${itemId}/quantity`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': csrfToken,
+    },
+    body: JSON.stringify({ quantity: qty })
+  });
+  if (!res.ok) throw new Error('update_failed');
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || 'update_failed');
+  return data.quantity;
+}
+
+document.querySelectorAll('.cart-item-qty').forEach(wrap => {
+  const itemId = wrap.dataset.itemId;
+  const input = wrap.querySelector('.qty-input');
+  wrap.querySelectorAll('.qty-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const delta = parseInt(btn.dataset.delta, 10);
+      const next = Math.max(1, (parseInt(input.value || '1', 10) + delta));
+      try {
+        input.value = await setQty(itemId, next);
+        window.location.reload();
+      } catch (e) {
+        window.location.reload();
+      }
+    });
+  });
+  input.addEventListener('change', async () => {
+    const next = Math.max(1, parseInt(input.value || '1', 10));
+    try {
+      input.value = await setQty(itemId, next);
+      window.location.reload();
+    } catch (e) {
+      window.location.reload();
+    }
+  });
+});
+</script>
 {% endblock %}

@@ -361,6 +361,129 @@ PRODUCTS = [
         "image_url": "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=600&q=80",
         "category": "Phụ kiện", "is_new": False, "is_on_sale": True,
     },
+
+    # ======= BỘ SƯU TẬP SPECIAL EDITION =======
+    {
+        "name": "Áo Hoodie UTH Campus Limited",
+        "description": (
+            "Áo hoodie limited in logo UTH Campus độc quyền, form unisex oversize cực chất. Vải nỉ bông "
+            "320gsm dày dặn, bên trong lót lông mềm siêu ấm. Bo tay và gấu áo dệt rib chắc chắn, không bai "
+            "sau nhiều lần giặt. Phù hợp đi học, đi chơi, mix cùng quần jean hay jogger đều đẹp."
+        ),
+        "price": 690000, "old_price": 850000,
+        "image_url": "https://images.unsplash.com/photo-1543076447-215ad9ba6923?w=600&q=80",
+        "category": "Áo", "is_new": True, "is_on_sale": True,
+    },
+    {
+        "name": "Set Tracksuit Thể Thao Streetwear",
+        "description": (
+            "Set tracksuit áo khoác + quần thể thao phong cách streetwear, chất nỉ co giãn 4 chiều thoải "
+            "mái vận động. Áo khoác có khóa kéo full zip, mũ trùm và túi kengroo; quần jogger bo gấu, có "
+            "dây rút bản lớn. Phù hợp tập gym, chạy bộ hoặc đi chơi cuối tuần. Form unisex, dễ phối đồ."
+        ),
+        "price": 980000, "old_price": 1250000,
+        "image_url": "https://images.unsplash.com/photo-1590874103328-eac38a683ce7?w=600&q=80",
+        "category": "Quần", "is_new": True, "is_on_sale": True,
+    },
+    {
+        "name": "Đầm Satin Dự Tiệc Aurora",
+        "description": (
+            "Đầm satin dự tiệc với bề mặt bóng nhẹ sang trọng, phom dáng ôm nhẹ phần eo, xòe nhẹ phần chân "
+            "tạo hiệu ứng uyển chuyển khi di chuyển. Dây áo mảnh có thể điều chỉnh, phần lưng khoét chữ V "
+            "gợi cảm nhưng vẫn tinh tế. Thích hợp dự tiệc, prom, chụp kỷ yếu hoặc dạ hội."
+        ),
+        "price": 1350000, "old_price": 1790000,
+        "image_url": "https://images.unsplash.com/photo-1514996937319-344454492b37?w=600&q=80",
+        "category": "Váy", "is_new": True, "is_on_sale": True,
+    },
+    {
+        "name": "Váy Babydoll Cotton Candy",
+        "description": (
+            "Váy babydoll cotton form rộng dễ thương, phù hợp mọi dáng người. Chất liệu cotton poplin "
+            "thoáng mát, lên form phồng nhẹ tự nhiên. Tầng váy xếp babydoll tạo độ bồng đáng yêu, cổ vuông "
+            "nữ tính, tay phồng nhẹ. Item hoàn hảo cho những buổi picnic, dạo phố hay đi học."
+        ),
+        "price": 520000,
+        "image_url": "https://images.unsplash.com/photo-1551537482-f2075a1d41f2?w=600&q=80",
+        "category": "Váy", "is_new": True, "is_on_sale": False,
+    },
+    {
+        "name": "Quần Cargo Utility Multi-Pocket",
+        "description": (
+            "Quần cargo utility đa túi đúng chất Y2K, chất vải kaki dày dặn nhưng vẫn mềm mại. 6 túi hộp "
+            "được bố trí cân đối ở hai bên đùi và hông, vừa thời trang vừa thực dụng. Cạp có dây rút và "
+            "đai đính kèm, ống có thể rút gọn bằng dây kéo. Phù hợp phong cách streetwear, hiphop."
+        ),
+        "price": 640000, "old_price": 790000,
+        "image_url": "https://images.unsplash.com/photo-1542272605-15d6c8f2dd9f?w=600&q=80",
+        "category": "Quần", "is_new": True, "is_on_sale": True,
+    },
+    {
+        "name": "Quần Jean Wide Leg Ultra High-Waist",
+        "description": (
+            "Quần jean ống rộng cạp siêu cao, giúp hack chân dài tối đa. Chất denim 13oz đứng form, wash "
+            "nhạt vintage cực trend. Đường may contrast màu vàng camel, cạp có 2 nút tạo điểm nhấn. "
+            "Phối cùng áo croptop hoặc áo sơ mi đóng thùng đều đẹp."
+        ),
+        "price": 820000,
+        "image_url": "https://images.unsplash.com/photo-1555685812-4b943f1cb0eb?w=600&q=80",
+        "category": "Quần", "is_new": True, "is_on_sale": False,
+    },
+    {
+        "name": "Áo Sơ Mi Lụa Classic Office",
+        "description": (
+            "Áo sơ mi lụa mềm rũ, phù hợp môi trường văn phòng chỉn chu. Bề mặt lụa mờ, ít nhăn, màu sắc "
+            "trung tính dễ phối như trắng, kem, nude, xanh pastel. Cổ đức nhỏ gọn, hàng cúc ẩn giúp tổng "
+            "thể tối giản nhưng vẫn sang trọng."
+        ),
+        "price": 610000,
+        "image_url": "https://images.unsplash.com/photo-1540411025311-95e2dd7565ce?w=600&q=80",
+        "category": "Áo", "is_new": False, "is_on_sale": False,
+    },
+    {
+        "name": "Áo Thun Graphic Artwork UTH Studio",
+        "description": (
+            "Áo thun in graphic artwork do UTH Studio thiết kế độc quyền. Vải cotton 230gsm dày dặn, "
+            "in lụa cao cấp không nứt, không bong tróc. Form boxy trẻ trung, cổ bo gân chắc chắn. "
+            "Phù hợp cho các bạn yêu thích phong cách street art và local brand."
+        ),
+        "price": 390000, "old_price": 450000,
+        "image_url": "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=600&q=80",
+        "category": "Áo", "is_new": True, "is_on_sale": True,
+    },
+    {
+        "name": "Sneaker Low-top Everyday Comfort",
+        "description": (
+            "Sneaker low-top classic với đế cao su đúc nguyên khối chống trơn trượt. Thân giày bằng canvas "
+            "phối da tổng hợp, lót trong bằng vải mesh thoáng khí. Đế lót memory foam êm chân, đi bộ cả "
+            "ngày không mỏi. Màu: trắng, đen, beige, xanh navy."
+        ),
+        "price": 890000, "old_price": 1090000,
+        "image_url": "https://images.unsplash.com/photo-1514986888952-8cd320577b68?w=600&q=80",
+        "category": "Phụ kiện", "is_new": True, "is_on_sale": True,
+    },
+    {
+        "name": "Giày Loafer Da Mũi Vuông",
+        "description": (
+            "Giày loafer da mũi vuông hiện đại, hợp trend office-chic. Thân giày làm từ da bò thật xử lý "
+            "mờ sang trọng, lót trong da mềm chống phồng rộp. Gót 3cm giúp tôn dáng nhưng vẫn dễ đi. "
+            "Phối đẹp với váy midi, quần tây hay jean ống đứng."
+        ),
+        "price": 1250000,
+        "image_url": "https://images.unsplash.com/photo-1591561954557-26941169b49e?w=600&q=80",
+        "category": "Phụ kiện", "is_new": True, "is_on_sale": False,
+    },
+    {
+        "name": "Balô Laptop Urban Tech",
+        "description": (
+            "Balô laptop phong cách urban-tech với nhiều ngăn chức năng: ngăn laptop 15.6', ngăn tablet, "
+            "ngăn phụ cho sạc dự phòng, chuột, sổ tay. Chất vải polyester chống nước nhẹ, đệm lưng 3D "
+            "thoáng khí. Cổng sạc USB tích hợp, dây đeo êm vai. Phù hợp cho sinh viên và dân văn phòng."
+        ),
+        "price": 990000,
+        "image_url": "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=600&q=80",
+        "category": "Phụ kiện", "is_new": True, "is_on_sale": False,
+    },
 ]
 
 
@@ -412,7 +535,7 @@ def seed_data():
 
         db.session.commit()
         total = Product.query.count()
-        print(f"✅ Database seeded! {total} sản phẩm đã được thêm.")
+        print(f"[OK] Database seeded! {total} san pham da duoc them vao.")
 
 
 if __name__ == '__main__':

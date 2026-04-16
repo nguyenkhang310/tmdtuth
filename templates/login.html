@@ -222,6 +222,7 @@
         <div class="auth-body">
             <!-- LOGIN FORM -->
             <form class="auth-form active" id="form-login" action="{{ url_for('login') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="form-group">
                     <label class="form-label">Email hoặc Tên đăng nhập</label>
                     <div class="input-icon-wrap">
@@ -247,13 +248,11 @@
                     <span class="material-symbols-outlined" style="font-size:1.1rem">login</span>
                     Đăng nhập
                 </button>
-                <div class="terms-note">
-                    Tài khoản demo: <strong>admin / admin123</strong>
-                </div>
             </form>
             
             <!-- REGISTER FORM -->
             <form class="auth-form" id="form-register" action="{{ url_for('register') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="form-group">
                     <label class="form-label">Họ và tên</label>
                     <div class="input-icon-wrap">

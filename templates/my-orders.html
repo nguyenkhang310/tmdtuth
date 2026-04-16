@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+{% block title %}Đơn hàng của tôi – {{ shop.name }}{% endblock %}
+
+{% block extra_styles %}
+<style>
+.account-hero {
+    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 60%, var(--primary-light) 100%);
+    padding: 3.5rem 2rem 2.5rem;
+    color: white;
+}
+.account-hero-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+.account-hero-avatar {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.18);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2rem; flex-shrink: 0;
+    border: 3px solid rgba(255,255,255,0.35);
+}
+.account-hero h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 2rem; font-weight: 700; margin-bottom: 0.25rem;
+}
+.account-hero p { opacity: 0.82; font-size: 0.9rem; }
+
+.account-tabs {
+    background: white;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 72px; z-index: 50;
+}
+.account-tabs-inner {
+    max-width: 1100px; margin: 0 auto; padding: 0 2rem;
+    display: flex; gap: 0;
+}
+.account-tabs a {
+    display: flex; align-items: center; gap: 0.45rem;
+    padding: 1rem 1.25rem;
+    font-size: 0.875rem; font-weight: 600;
+    color: var(--text-muted);
+    text-decoration: none;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+.account-tabs a:hover { color: var(--primary); }
+.account-tabs a.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+}
+
+.orders-section {
+    max-width: 1100px; margin: 2.5rem auto; padding: 0 2rem;
+}
+
+.orders-empty {
+    text-align: center; padding: 5rem 2rem;
+    background: white; border-radius: 16px;
+    border: 1px solid var(--border);
+}
+.orders-empty .material-symbols-outlined {
+    font-size: 3.5rem; color: var(--border); margin-bottom: 1rem;
+}
+.orders-empty h3 { font-size: 1.2rem; color: var(--text-muted); margin-bottom: 0.75rem; }
+.orders-empty p { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.5rem; }
+
+.order-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    margin-bottom: 1.25rem;
+    overflow: hidden;
+    transition: box-shadow 0.2s, border-color 0.2s;
+}
+.order-card:hover {
+    box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+    border-color: #d1d5db;
+}
+.order-card-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1.1rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    background: #fafaf9;
+    flex-wrap: wrap; gap: 0.75rem;
+}
+.order-id {
+    font-weight: 700; font-size: 1rem; color: var(--primary);
+}
+.order-date { font-size: 0.82rem; color: var(--text-muted); }
+
+.status-badge {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    padding: 0.3rem 0.85rem;
+    border-radius: 999px; font-size: 0.78rem; font-weight: 600;
+}
+.status-pending   { background: #fef3c7; color: #92400e; }
+.status-paid      { background: #d1fae5; color: #065f46; }
+.status-shipped   { background: #dbeafe; color: #1e40af; }
+.status-delivered { background: #d1fae5; color: #065f46; }
+.status-cancelled { background: #fee2e2; color: #dc2626; }
+
+.order-card-body {
+    padding: 1.25rem 1.5rem;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem; flex-wrap: wrap;
+}
+.order-preview {
+    display: flex; gap: 0.6rem; flex-wrap: wrap;
+}
+.order-preview-img {
+    width: 56px; height: 56px;
+    border-radius: 10px;
+    object-fit: cover;
+    border: 1px solid var(--border);
+    flex-shrink: 0;
+}
+.order-preview-more {
+    width: 56px; height: 56px;
+    border-radius: 10px;
+    background: var(--surface2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.8rem; font-weight: 700; color: var(--text-muted);
+    border: 1px solid var(--border);
+}
+.order-meta { text-align: right; }
+.order-meta-label { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.25rem; }
+.order-total {
+    font-size: 1.2rem; font-weight: 700; color: var(--primary);
+    font-family: 'Playfair Display', serif;
+}
+.order-payment {
+    font-size: 0.78rem; color: var(--text-muted); margin-top: 0.2rem;
+}
+.order-actions { display: flex; gap: 0.6rem; align-items: center; }
+.btn-sm {
+    padding: 0.5rem 1rem;
+    font-size: 0.82rem;
+    border-radius: 8px;
+    font-weight: 600;
+}
+
+@media (max-width: 640px) {
+    .account-hero h1 { font-size: 1.5rem; }
+    .order-card-header { flex-direction: column; align-items: flex-start; }
+    .order-meta { text-align: left; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Hero -->
+<div class="account-hero">
+    <div class="account-hero-inner">
+        <div class="account-hero-avatar">
+            <span class="material-symbols-outlined">person</span>
+        </div>
+        <div>
+            <h1>{{ current_user.username }}</h1>
+            <p>{{ current_user.email }}</p>
+        </div>
+    </div>
+</div>
+
+<!-- Tabs -->
+<div class="account-tabs">
+    <div class="account-tabs-inner">
+        <a href="{{ url_for('my_orders') }}" class="active">
+            <span class="material-symbols-outlined" style="font-size:1.05rem">receipt_long</span>
+            Đơn hàng của tôi
+        </a>
+        <a href="{{ url_for('profile') }}">
+            <span class="material-symbols-outlined" style="font-size:1.05rem">manage_accounts</span>
+            Thông tin tài khoản
+        </a>
+        <a href="{{ url_for('wishlist') }}">
+            <span class="material-symbols-outlined" style="font-size:1.05rem">favorite</span>
+            Yêu thích
+        </a>
+    </div>
+</div>
+
+<!-- Orders List -->
+<div class="orders-section">
+    {% if not orders %}
+    <div class="orders-empty">
+        <span class="material-symbols-outlined">receipt_long</span>
+        <h3>Bạn chưa có đơn hàng nào</h3>
+        <p>Hãy khám phá các sản phẩm và đặt hàng ngay!</p>
+        <a href="{{ url_for('products') }}" class="btn btn-primary">
+            <span class="material-symbols-outlined" style="font-size:1rem">shopping_bag</span>
+            Mua sắm ngay
+        </a>
+    </div>
+    {% else %}
+    <p style="color:var(--text-muted);font-size:0.88rem;margin-bottom:1.25rem">
+        Tổng <strong style="color:var(--text)">{{ orders|length }}</strong> đơn hàng
+    </p>
+    {% for order in orders %}
+    {% set preview_items = order.items[:3] %}
+    {% set extra = order.items|length - 3 %}
+    <div class="order-card">
+        <div class="order-card-header">
+            <div>
+                <div class="order-id">#{{ order.id }}</div>
+                <div class="order-date">
+                    <span class="material-symbols-outlined" style="font-size:0.9rem;vertical-align:middle">schedule</span>
+                    {{ order.created_at.strftime('%d/%m/%Y %H:%M') if order.created_at else 'N/A' }}
+                </div>
+            </div>
+            <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap">
+                {% set s = order.status %}
+                <span class="status-badge status-{{ s }}">
+                    {% if s == 'pending' %}⏳ Chờ xử lý
+                    {% elif s == 'paid' %}💳 Đã thanh toán
+                    {% elif s == 'shipped' %}🚚 Đang giao hàng
+                    {% elif s == 'delivered' %}✅ Đã giao
+                    {% elif s == 'cancelled' %}❌ Đã hủy
+                    {% else %}{{ s }}{% endif %}
+                </span>
+                {% set ps = order.payment_status %}
+                {% if ps == 'unpaid' %}
+                <span class="status-badge" style="background:#fef3c7;color:#92400e">💰 Chưa thanh toán</span>
+                {% elif ps == 'paid' %}
+                <span class="status-badge" style="background:#d1fae5;color:#065f46">💳 Đã TT</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="order-card-body">
+            <!-- Preview images -->
+            <div class="order-preview">
+                {% for item in preview_items %}
+                <img class="order-preview-img"
+                     src="{{ item.product.image_url or url_for('static', filename='placeholder.png') }}"
+                     alt="{{ item.product.name }}"
+                     title="{{ item.product.name }} x{{ item.quantity }}">
+                {% endfor %}
+                {% if extra > 0 %}
+                <div class="order-preview-more">+{{ extra }}</div>
+                {% endif %}
+            </div>
+            <!-- Total + actions -->
+            <div style="display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap">
+                <div class="order-meta">
+                    <div class="order-meta-label">Tổng tiền</div>
+                    <div class="order-total">{{ "{:,.0f}".format(order.total_amount) }}₫</div>
+                    <div class="order-payment">{{ order.payment_method }}</div>
+                </div>
+                <div class="order-actions">
+                    <a href="{{ url_for('order_detail', order_id=order.id) }}" class="btn btn-outline btn-sm">
+                        <span class="material-symbols-outlined" style="font-size:0.9rem">visibility</span>
+                        Chi tiết
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+</div>
+{% endblock %}

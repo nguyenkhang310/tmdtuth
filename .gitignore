@@ -1,0 +1,29 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ── Virtual environments ───────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+
+# ── Flask / runtime ────────────────────────────────────────────────────────────
+instance/          # SQLite DB + instance config
+.env               # Never commit secrets
+.env.*
+
+# ── Uploads (user-generated content) ──────────────────────────────────────────
+static/uploads/*
+!static/uploads/.gitkeep
+
+# ── OS / editor ───────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo

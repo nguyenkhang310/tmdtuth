@@ -415,6 +415,9 @@
         <a href="#" class="admin-nav-link" id="nav-contacts" onclick="showTab('contacts', this); return false;">
             <span class="material-symbols-outlined">mail</span> Liên hệ
         </a>
+        <a href="#" class="admin-nav-link" id="nav-marketing" onclick="showTab('marketing', this); return false;">
+            <span class="material-symbols-outlined">campaign</span> Marketing
+        </a>
 
         <div class="admin-sidebar-title">Hệ thống</div>
         <a href="{{ url_for('index') }}" class="admin-nav-link">
@@ -658,6 +661,7 @@
                     <h2><span class="material-symbols-outlined">add_circle</span> Thêm sản phẩm mới</h2>
                 </div>
                 <form action="{{ url_for('admin_add_product') }}" method="POST" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="quick-add-form">
                         <div class="form-group">
                             <label class="form-label">Tên sản phẩm *</label>
@@ -793,11 +797,12 @@ VD: Áo sơ mi Oxford cao cấp, chất liệu cotton 100% thoáng mát, form re
                                         <a href="{{ url_for('product_detail', product_id=product.id) }}" class="action-btn edit" title="Xem sản phẩm">
                                             <span class="material-symbols-outlined">visibility</span>
                                         </a>
-                                        <a href="{{ url_for('admin_delete_product', product_id=product.id) }}"
-                                           class="action-btn delete" title="Xóa"
-                                           onclick="return confirm('Xóa sản phẩm \'{{ product.name }}\'?')">
-                                            <span class="material-symbols-outlined">delete</span>
-                                        </a>
+                                        <form method="POST" action="{{ url_for('admin_delete_product', product_id=product.id) }}" style="margin:0" onsubmit="return confirm('Xóa sản phẩm \\'{{ product.name }}\\'?')">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button type="submit" class="action-btn delete" title="Xóa" style="border:none">
+                                                <span class="material-symbols-outlined">delete</span>
+                                            </button>
+                                        </form>
                                     </div>
                                 </td>
                             </tr>
@@ -823,14 +828,29 @@ VD: Áo sơ mi Oxford cao cấp, chất liệu cotton 100% thoáng mát, form re
                 <div style="overflow-x:auto">
                     <table class="admin-table">
                         <thead>
-                            <tr><th>#</th><th>Khách hàng</th><th>Tổng tiền</th><th>Trạng thái</th><th>Ngày đặt</th><th>Cập nhật</th></tr>
+                            <tr><th>#</th><th>Khách hàng</th><th>Tổng tiền</th><th>Thanh toán</th><th>Trạng thái</th><th>Ngày đặt</th><th>Cập nhật</th></tr>
                         </thead>
                         <tbody>
                             {% for order in analytics.recent_orders %}
                             <tr>
-                                <td><strong>#{{ order.id }}</strong></td>
+                                <td>
+                                    <a href="{{ url_for('order_detail', order_id=order.id) }}" style="font-weight:800;color:var(--text);text-decoration:none">
+                                        #{{ order.id }}
+                                    </a>
+                                </td>
                                 <td>{{ order.user.username if order.user else '—' }}</td>
                                 <td style="color:var(--primary);font-weight:700">{{ "{:,.0f}".format(order.total_amount) }}đ</td>
+                                <td>
+                                    {% if order.payment_status == 'paid' %}
+                                        <span class="badge badge-green">Paid</span>
+                                    {% elif order.payment_status == 'initiated' %}
+                                        <span class="badge badge-blue">Initiated</span>
+                                    {% elif order.payment_status == 'failed' %}
+                                        <span class="badge badge-red">Failed</span>
+                                    {% else %}
+                                        <span class="badge badge-gray">Unpaid</span>
+                                    {% endif %}
+                                </td>
                                 <td>
                                     {% if order.status == 'pending' %}<span class="badge badge-yellow">Chờ xử lý</span>
                                     {% elif order.status == 'paid' %}<span class="badge badge-blue">Đã thanh toán</span>
@@ -842,6 +862,7 @@ VD: Áo sơ mi Oxford cao cấp, chất liệu cotton 100% thoáng mát, form re
                                 <td style="font-size:0.8rem;color:var(--text-muted)">{{ order.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
                                 <td>
                                     <form action="{{ url_for('admin_update_order_status', order_id=order.id) }}" method="POST" style="display:flex;gap:0.5rem;align-items:center">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                         <select name="status" class="status-select">
                                             <option value="pending"   {% if order.status=='pending'   %}selected{% endif %}>Chờ xử lý</option>
                                             <option value="paid"      {% if order.status=='paid'      %}selected{% endif %}>Thanh toán</option>
@@ -852,6 +873,9 @@ VD: Áo sơ mi Oxford cao cấp, chất liệu cotton 100% thoáng mát, form re
                                         <button type="submit" class="action-btn edit" title="Lưu" style="width:auto;padding:0 0.5rem;font-size:0.75rem;border-radius:6px">
                                             <span class="material-symbols-outlined">save</span>
                                         </button>
+                                        <a href="{{ url_for('order_detail', order_id=order.id) }}" class="action-btn edit" title="Xem" style="width:auto;padding:0 0.5rem;font-size:0.75rem;border-radius:6px;text-decoration:none;display:flex;align-items:center">
+                                            <span class="material-symbols-outlined">visibility</span>
+                                        </a>
                                     </form>
                                 </td>
                             </tr>
@@ -864,6 +888,113 @@ VD: Áo sơ mi Oxford cao cấp, chất liệu cotton 100% thoáng mát, form re
                     <span class="material-symbols-outlined" style="font-size:3rem;display:block;margin-bottom:0.75rem;opacity:0.4">receipt_long</span>
                     Chưa có đơn hàng nào.
                 </div>
+                {% endif %}
+            </div>
+
+            <div class="admin-section">
+                <div class="admin-section-header">
+                    <h2><span class="material-symbols-outlined">payments</span> Lịch sử giao dịch thanh toán</h2>
+                </div>
+                {% if payment_transactions %}
+                <div style="overflow-x:auto">
+                    <table class="admin-table">
+                        <thead><tr><th>Thời gian</th><th>Đơn</th><th>Cổng</th><th>Số tiền</th><th>Ref</th><th>Trạng thái</th></tr></thead>
+                        <tbody>
+                        {% for tx in payment_transactions %}
+                            <tr>
+                                <td style="font-size:0.8rem;color:var(--text-muted)">{{ tx.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                                <td><a href="{{ url_for('order_detail', order_id=tx.order_id) }}" style="text-decoration:none;font-weight:700;color:var(--text)">#{{ tx.order_id }}</a></td>
+                                <td>{{ tx.provider }}</td>
+                                <td>{{ "{:,.0f}".format(tx.amount) }}đ</td>
+                                <td>{{ tx.provider_ref or '—' }}</td>
+                                <td>
+                                    {% if tx.status == 'paid' %}<span class="badge badge-green">Paid</span>
+                                    {% elif tx.status == 'failed' %}<span class="badge badge-red">Failed</span>
+                                    {% else %}<span class="badge badge-yellow">{{ tx.status }}</span>{% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div style="text-align:center;padding:2rem;color:var(--text-muted)">Chưa có giao dịch thanh toán.</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- ========== TAB: MARKETING ========== -->
+        <div id="tab-marketing" style="display:none">
+            <div class="admin-header">
+                <h1>Marketing & Coupon</h1>
+            </div>
+            <div class="admin-section">
+                <div class="admin-section-header">
+                    <h2><span class="material-symbols-outlined">sell</span> Tạo coupon mới</h2>
+                </div>
+                <form method="POST" action="{{ url_for('admin_add_coupon') }}" class="quick-add-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="form-group">
+                        <label class="form-label">Mã coupon</label>
+                        <input class="form-input" name="code" placeholder="VD: SUMMER10" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Loại</label>
+                        <select class="form-select" name="coupon_type">
+                            <option value="percent">Phần trăm (%)</option>
+                            <option value="fixed">Giảm cố định (đ)</option>
+                            <option value="shipping">Giảm ship (đ)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Giá trị</label>
+                        <input class="form-input" type="number" min="1" name="value" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Đơn tối thiểu</label>
+                        <input class="form-input" type="number" min="0" name="min_subtotal" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Giới hạn lượt dùng</label>
+                        <input class="form-input" type="number" min="1" name="max_uses" placeholder="Để trống nếu không giới hạn">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Hạn sử dụng</label>
+                        <input class="form-input" type="datetime-local" name="expires_at">
+                    </div>
+                    <div class="form-group full-width">
+                        <button class="btn btn-primary" type="submit">Tạo coupon</button>
+                    </div>
+                </form>
+            </div>
+            <div class="admin-section">
+                <div class="admin-section-header">
+                    <h2><span class="material-symbols-outlined">discount</span> Danh sách coupon</h2>
+                </div>
+                {% if coupons %}
+                <table class="admin-table">
+                    <thead><tr><th>Mã</th><th>Loại</th><th>Giá trị</th><th>Đơn tối thiểu</th><th>Đã dùng</th><th>Hết hạn</th><th></th></tr></thead>
+                    <tbody>
+                    {% for c in coupons %}
+                    <tr>
+                        <td><strong>{{ c.code }}</strong></td>
+                        <td>{{ c.coupon_type }}</td>
+                        <td>{{ "{:,.0f}".format(c.value) }}{% if c.coupon_type == 'percent' %}%{% else %}đ{% endif %}</td>
+                        <td>{{ "{:,.0f}".format(c.min_subtotal) }}đ</td>
+                        <td>{{ c.used_count }}{% if c.max_uses %}/{{ c.max_uses }}{% endif %}</td>
+                        <td>{% if c.expires_at %}{{ c.expires_at.strftime('%d/%m/%Y %H:%M') }}{% else %}Không giới hạn{% endif %}</td>
+                        <td>
+                            <form method="POST" action="{{ url_for('admin_delete_coupon', coupon_id=c.id) }}" onsubmit="return confirm('Xóa coupon {{ c.code }}?')">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button class="action-btn delete" type="submit"><span class="material-symbols-outlined">delete</span></button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div style="text-align:center;padding:2rem;color:var(--text-muted)">Chưa có coupon nào.</div>
                 {% endif %}
             </div>
         </div>
