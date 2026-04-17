@@ -27,28 +27,28 @@ Hệ thống tuân thủ chặt chẽ kiến trúc Client-Server và triển kha
 
 ```mermaid
 graph TD
-    sublayer_Client[Phía Máy Khách]
+    subgraph Client [Phía Máy Khách]
         Browser[Trình duyệt Khách hàng / Quản trị viên]
     end
 
-    sublayer_Middleware[Lớp Trung Gian & Bảo Mật]
+    subgraph Middleware [Lớp Trung Gian & Bảo Mật]
         RateLimiter[Flask-Limiter & Redis - Chống DDoS]
         Auth[Flask-Login & CSRF Token]
     end
 
-    sublayer_Core[Lõi Business Logic - Flask]
+    subgraph Core [Lõi Business Logic - Flask]
         Route_Admin[Admin Routes Modules]
         Route_Client[Client / Public API Routes]
         Payment_Module[Giao thức Cổng Thanh Toán]
     end
 
-    sublayer_Database[Lớp Dữ Liệu - ORM]
+    subgraph Database [Lớp Dữ Liệu - ORM]
         SQLAlchemy[Flask-SQLAlchemy]
         DB[(Cơ Sở Dữ Liệu Quan Hệ SQL)]
         Cache_Sess[Flask Session State]
     end
 
-    sublayer_External[Dịch vụ Ngoại vi]
+    subgraph External [Dịch vụ Ngoại vi]
         MoMo_API[API Thanh toán MoMo]
         VNPAY_API[API Thanh toán VNPAY]
     end
