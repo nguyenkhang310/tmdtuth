@@ -26,47 +26,280 @@ Hệ thống tuân thủ chặt chẽ kiến trúc Client-Server và triển kha
 ### 2.1. Sơ Đồ Khối Kiến Trúc Tương Tác Hệ Thống (System Architecture)
 
 ```mermaid
-graph TD
-    subgraph Client [Phía Máy Khách]
-        Browser[Trình duyệt Khách hàng / Quản trị viên]
-    end
+graph LR
+    A[Trình duyệt của máy khách] <-->|Gửi Request / Nhận Response| B["Máy chủ xử lý lõi (Python/Flask)"]
+    B <-->|Truy vấn / Trả kết quả| C[("Hệ quản trị cơ sở dữ liệu (SQLite)")]
+    B <-->|Dữ liệu giao dịch| D["Máy chủ của cổng thanh toán trực tuyến (MoMo, VNPAY)"]
+```
 
-    subgraph Middleware [Lớp Trung Gian & Bảo Mật]
-        RateLimiter[Flask-Limiter & Redis - Chống DDoS]
-        Auth[Flask-Login & CSRF Token]
-    end
+### 2.2. Sơ Đồ Luồng Hoạt Động (Flowchart Request-Response Lifecycle)
 
-    subgraph Core [Lõi Business Logic - Flask]
-        Route_Admin[Admin Routes Modules]
-        Route_Client[Client / Public API Routes]
-        Payment_Module[Giao thức Cổng Thanh Toán]
-    end
+```mermaid
+flowchart TD
+    A([Trình duyệt gửi Request]) --> B{Lớp chặn thư rác<br>Limiter trên Redis}
+    B -- Cho qua --> C{Xác thực mã thông báo<br>chống giả mạo CSRF}
+    C -- Hợp lệ --> D[Hàm xử lý logic tại máy chủ<br>tệp app.py]
+    D --> E[Bộ trộn giao diện<br>Jinja2]
+    E --> F([Trả mã HTML về lại trình duyệt])
+```
 
-    subgraph Database [Lớp Dữ Liệu - ORM]
-        SQLAlchemy[Flask-SQLAlchemy]
-        DB[(Cơ Sở Dữ Liệu Quan Hệ SQL)]
-        Cache_Sess[Flask Session State]
-    end
+### 2.3. Sơ Đồ Thực Thể Kết Hợp (ER Diagram)
 
-    subgraph External [Dịch vụ Ngoại vi]
-        MoMo_API[API Thanh toán MoMo]
-        VNPAY_API[API Thanh toán VNPAY]
-    end
+```mermaid
+erDiagram
+    CATEGORY ||--o{ PRODUCT : "1-N"
+    PRODUCT ||--o{ CART_ITEM : "nằm trong"
+    CART ||--o{ CART_ITEM : "master-detail"
+    USER ||--|| CART : "sở hữu"
+    USER ||--o{ ORDER : "đặt"
+    USER ||--o{ REVIEW : "viết"
+    PRODUCT ||--o{ ORDER_ITEM : "nội dung"
+    ORDER ||--o{ ORDER_ITEM : "bao gồm"
+    ORDER ||--o| PAYMENT_TRANSACTION : "liên kết"
+    PRODUCT ||--o{ REVIEW : "nhận được"
 
-    Browser -->|HTTP / HTTPS| RateLimiter
-    RateLimiter -->|Cho phép truy cập| Auth
-    Auth --> Route_Admin
-    Auth --> Route_Client
+    USER {
+        int id PK
+        string username
+    }
+    CATEGORY {
+        int id PK
+        string name
+    }
+    PRODUCT {
+        int id PK
+        string name
+        int category_id FK
+    }
+    CART {
+        int id PK
+        int user_id FK
+    }
+    CART_ITEM {
+        int id PK
+        int cart_id FK
+        int product_id FK
+    }
+    ORDER {
+        int id PK
+        int user_id FK
+    }
+    ORDER_ITEM {
+        int id PK
+        int order_id FK
+        int product_id FK
+    }
+    PAYMENT_TRANSACTION {
+        int id PK
+        int order_id FK
+        text raw_response "Lưu chuỗi dữ liệu thô dạng JSON"
+    }
+    COUPON {
+        int id PK
+        string code
+    }
+    REVIEW {
+        int id PK
+        int user_id FK
+        int product_id FK
+    }
+```
+
+### 2.4. Biểu Đồ Lớp (Class Diagram)
+
+```mermaid
+classDiagram
+    class User {
+        +Integer id
+        +String username
+        +String email
+        +String password_hash
+        +String role
+        +carts (Backref)
+        +orders (Backref)
+        +reviews (Backref)
+        +wishlist_items (Backref)
+    }
+
+    class Category {
+        +Integer id
+        +String name
+        +products (Backref)
+    }
+
+    class Product {
+        +Integer id
+        +String name
+        +Text description
+        +Float price
+        +Float old_price
+        +String image_url
+        +Integer stock
+        +DateTime created_at
+        +Integer category_id
+        +Boolean is_new
+        +Boolean is_on_sale
+        +reviews (Backref)
+        +order_items (Backref)
+    }
+
+    class Cart {
+        +Integer id
+        +Integer user_id
+        +items (Backref)
+    }
+
+    class CartItem {
+        +Integer id
+        +Integer cart_id
+        +Integer product_id
+        +Integer quantity
+    }
+
+    class Order {
+        +Integer id
+        +Integer user_id
+        +Float total_amount
+        +String status
+        +DateTime created_at
+        +String shipping_name
+        +String shipping_phone
+        +String shipping_address
+        +String note
+        +String payment_method
+        +String payment_status
+        +String payment_ref
+        +items (Backref)
+        +transactions (Backref)
+    }
+
+    class PaymentTransaction {
+        +Integer id
+        +Integer order_id
+        +String provider
+        +Float amount
+        +String status
+        +String provider_ref
+        +Text raw_request
+        +Text raw_response
+        +DateTime created_at
+    }
+
+    class Coupon {
+        +Integer id
+        +String code
+        +String coupon_type
+        +Float value
+        +Float min_subtotal
+        +Boolean is_active
+        +DateTime expires_at
+        +Integer max_uses
+        +Integer used_count
+        +DateTime created_at
+    }
+
+    class OrderItem {
+        +Integer id
+        +Integer order_id
+        +Integer product_id
+        +Integer quantity
+        +Float price
+    }
+
+    class Review {
+        +Integer id
+        +Integer product_id
+        +Integer user_id
+        +Integer rating
+        +Text comment
+        +DateTime created_at
+    }
+
+    Category "1" *-- "many" Product : Khóa ngoại (category_id)
+    User "1" *-- "many" Cart : Khóa ngoại (user_id)
+    User "1" *-- "many" Order : Khóa ngoại (user_id)
+    User "1" *-- "many" Review : Khóa ngoại (user_id)
+    Cart "1" *-- "many" CartItem : Khóa ngoại (cart_id)
+    Product "1" *-- "many" CartItem : Khóa ngoại (product_id)
+    Order "1" *-- "many" OrderItem : Khóa ngoại (order_id)
+    Product "1" *-- "many" OrderItem : Khóa ngoại (product_id)
+    Order "1" *-- "many" PaymentTransaction : Khóa ngoại (order_id)
+    Product "1" *-- "many" Review : Khóa ngoại (product_id)
+```
+
+### 2.5. Các Biểu Đồ Hoạt Động (Activity Diagram)
+
+#### 2.5.1. Luồng Cơ Chế Gộp Giỏ Hàng
+
+```mermaid
+flowchart TD
+    Start([Khách vãng lai chọn sản phẩm]) --> A[Lưu trên phiên bộ nhớ tạm]
+    A --> B[Khách tiến hành đăng ký/đăng nhập]
+    B --> C[Hệ thống tự động quét mảng dữ liệu phiên]
+    C --> D[Đồng nhất hóa / Lưu vào bảng giỏ hàng trong cơ sở dữ liệu của người dùng]
+    D --> End([Kết thúc])
+```
+
+#### 2.5.2. Luồng Thanh Toán và Mã Khuyến Mãi
+
+```mermaid
+flowchart TD
+    Start([Bắt đầu tính toán giỏ hàng]) --> Fork(( ))
     
-    Route_Admin -->|Trích xuất, Phân tích| SQLAlchemy
-    Route_Client -->|Bản lưu Giỏ hàng| Cache_Sess
-    Route_Client -->|Truy vấn Hàng hóa| SQLAlchemy
-    Route_Client -->|Yêu cầu giao dịch| Payment_Module
+    Fork --> Calc1[Trừ theo tỷ lệ phần trăm]
+    Fork --> Calc2[Trừ thẳng mức giá cố định]
+    Fork --> Calc3[Chiết khấu miễn phí giao hàng nội đô]
     
-    Payment_Module -->|Mã hóa HMAC SHA256| MoMo_API
-    Payment_Module -->|Mã hóa HMAC SHA512| VNPAY_API
+    Calc1 --> Join(( ))
+    Calc2 --> Join(( ))
+    Calc3 --> Join(( ))
+    
+    Join --> Total[Gộp thành một tổng tiền duy nhất]
+    Total --> Decision{Lựa chọn thanh toán}
+    
+    Decision -- Thẻ ngân hàng --> Bank[Giao diện thanh toán thẻ ngân hàng]
+    Decision -- Ví điện tử --> EWallet[Giao diện thanh toán ví điện tử]
+```
 
-    SQLAlchemy <--> DB
+### 2.6. Các Biểu Đồ Tuần Tự (Sequence Diagram)
+
+#### 2.6.1. Vòng Đời Xử Lý Truy Vấn
+
+```mermaid
+sequenceDiagram
+    participant Client as Máy khách
+    participant Server as Máy chủ
+    participant DB as Cơ sở dữ liệu
+
+    Client->>Server: Máy khách gửi dữ liệu lên
+    activate Server
+    Server->>DB: Máy chủ gọi CSDL
+    activate DB
+    DB-->>Server: CSDL trả dữ liệu cho Máy chủ
+    deactivate DB
+    Server-->>Client: Máy chủ trả kết quả về Trình duyệt
+    deactivate Server
+```
+
+#### 2.6.2. Giao Dịch Thanh Toán Số
+
+```mermaid
+sequenceDiagram
+    participant Client as Khách hàng
+    participant Server as Máy chủ UTH
+    participant Gateway as Cổng thanh toán (MoMo/VNPAY)
+
+    Client->>Server: Khách xác nhận đơn
+    activate Server
+    Server->>Server: Khởi tạo chuẩn giao dịch và mã chữ ký điện tử
+    Server->>Gateway: Máy chủ gửi gói dữ liệu đi và tạo mã kiểm dò bảo mật (HMAC)
+    activate Gateway
+    Gateway->>Gateway: Cổng thanh toán trừ tiền khách
+    Gateway-->>Server: Cổng thanh toán trả kết quả (Webhook) về máy chủ
+    deactivate Gateway
+    Server->>Server: Máy chủ UTH dùng mã kiểm dò đối chiếu với thông báo để xác thực
+    Server-->>Client: Hiển thị kết quả thanh toán
+    deactivate Server
 ```
 
 ---
@@ -124,132 +357,7 @@ Thư mục <code>/templates</code> chứa các giao diện được phân tách 
 
 ---
 
-## 5. SƠ ĐỒ THỰC THỂ KẾT HỢP DỮ LIỆU CHUYÊN SÂU (ER DIAGRAM)
-
-Cấu trúc định tuyến kết nối quan hệ mô tả cơ sở hạ tầng các thực thể sống trong dự án:
-
-```mermaid
-erDiagram
-    %% USER TABLE
-    USER {
-        int id PK
-        string username
-        string email
-        string password_hash
-        string role "admin / user"
-    }
-    
-    %% CATEGORY AND PRODUCT TABLES
-    CATEGORY {
-        int id PK
-        string name
-    }
-    PRODUCT {
-        int id PK
-        string name
-        text description
-        float price
-        float old_price
-        string image_url
-        int stock
-        datetime created_at
-        boolean is_new
-        boolean is_on_sale
-        int category_id FK
-    }
-
-    %% ORDER AND PAYMENT TABLES
-    ORDER {
-        int id PK
-        float total_amount
-        string status "pending/paid/shipped"
-        datetime created_at
-        string shipping_name
-        string shipping_phone
-        string shipping_address
-        string payment_method
-        string payment_status
-        string payment_ref
-        int user_id FK
-    }
-    ORDER_ITEM {
-        int id PK
-        int quantity
-        float price
-        int order_id FK
-        int product_id FK
-    }
-    PAYMENT_TRANSACTION {
-        int id PK
-        string provider
-        float amount
-        string status
-        string provider_ref
-        text raw_request
-        int order_id FK
-    }
-
-    %% CART AND WISHLIST
-    CART {
-        int id PK
-        int user_id FK
-    }
-    CART_ITEM {
-        int id PK
-        int quantity
-        int cart_id FK
-        int product_id FK
-    }
-    WISHLIST_ITEM {
-        int id PK
-        datetime created_at
-        int user_id FK
-        int product_id FK
-    }
-
-    %% COUPON AND REVIEWS
-    COUPON {
-        int id PK
-        string code
-        string coupon_type "percent / fixed / shipping"
-        float value
-        float min_subtotal
-        boolean is_active
-        datetime expires_at
-        int max_uses
-        int used_count
-    }
-    REVIEW {
-        int id PK
-        int rating
-        text comment
-        datetime created_at
-        int product_id FK
-        int user_id FK
-    }
-
-    %% RELATIONAL CONNECTIONS
-    USER ||--o{ ORDER : "Thiết lập Đơn hàng"
-    USER ||--o| CART : "Được cấp quyền sử dụng Giỏ hàng"
-    USER ||--o{ REVIEW : "Viết Nhận xét"
-    USER ||--o{ WISHLIST_ITEM : "Thêm vào Mục yêu thích"
-    
-    CATEGORY ||--o{ PRODUCT : "Bao trùm phân nhóm"
-    
-    ORDER ||--o{ ORDER_ITEM : "Bao gồm nhiều Lịch trình Hàng hóa"
-    ORDER ||--o{ PAYMENT_TRANSACTION : "Xác minh Trạng thái Chuyển khoản"
-    
-    CART ||--o{ CART_ITEM : "Chứa nhiều Nhóm hàng con"
-    
-    PRODUCT ||--o{ ORDER_ITEM : "Trích dẫn Tồn kho vào Đơn"
-    PRODUCT ||--o{ CART_ITEM : "Thể hiện Mặt hàng đang Mua"
-    PRODUCT ||--o{ REVIEW : "Nhận được phản hồi"
-    PRODUCT ||--o{ WISHLIST_ITEM : "Chỉ định sản phẩm vào danh sách yêu thích"
-```
-
----
-
-## 6. KHÍA CẠNH BẢO MẬT & TỐI ƯU HIỆU SUẤT TRONG KIẾN TRÚC
+## 5. KHÍA CẠNH BẢO MẬT & TỐI ƯU HIỆU SUẤT TRONG KIẾN TRÚC
 
 1.  **Vệ sinh dữ liệu đầu vào (Input Sanitization)**: Khống chế Injection thông qua ORM tĩnh hóa các chuỗi string thành định dạng bảo vệ. Hàm `secure_filename()` của Werkzeug khử trùng tên tập tin (XSS và lổ hổng thư mục Path Traversal).
 2.  **Định tuyến luồng mã hóa PBKDF2**: Không lưu trực tiếp chữ và số ở CSDL mà tạo mã hàm khối Hash 256 giúp bảo mật mật khẩu. Khi rò rỉ dữ liệu Database cũng không thể khai thác quy ngược trở lại plain-text.
@@ -258,6 +366,6 @@ erDiagram
 
 ---
 
-## 7. KẾT LUẬN
+## 6. KẾT LUẬN
 
 Hệ thống UTH Store là một nguyên bản mạnh mẽ, mang đặc thù một cơ cấu hoàn chỉnh trong hệ sinh thái ứng dụng Python Backend. Trục định tuyến mạch lạc kết hợp tính năng bảo mật toàn diện cho phép nền tảng dễ dàng trở thành tư liệu mẫu cao cấp cho mọi công tác nghiên cứu, luận văn hay phát triển thành Commercial System chính thống. Blueprint cấu trúc mở thuận tiện để tiếp tục triển khai Dockerization và Micro-service hóa trong lộ trình tương lai.
