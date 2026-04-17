@@ -1,6 +1,6 @@
 # BÁO CÁO CẤU TRÚC KỸ THUẬT VÀ PHÂN TÍCH HỆ THỐNG THƯƠNG MẠI ĐIỆN TỬ (UTH STORE)
 
-Tài liệu này là một bản phân tích chuyên sâu toàn diện về nền tảng thương mại điện tử **UTH Store**. Tài liệu được biên soạn đặc biệt để phục vụ cho mục đích làm tài liệu thiết kế hệ thống, báo cáo đồ án khóa luận tốt nghiệp, đánh giá kiến trúc phần mềm và làm tài liệu hướng dẫn kỹ thuật cho các kỹ sư phát triển.
+Tài liệu này là một bản phân tích chuyên sâu toàn diện về nền tảng thương mại điện tử **UTH Store**. Tài liệu được viết đặc biệt để phục vụ cho mục đích làm tài liệu thiết kế hệ thống, báo cáo đồ án môn học, đánh giá kiến trúc phần mềm và làm tài liệu hướng dẫn kỹ thuật cho các kỹ sư phát triển.
 
 ---
 
