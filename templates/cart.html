@@ -54,9 +54,12 @@
     font-weight: 600;
     font-size: 1rem;
     margin-bottom: 0.25rem;
-    white-space: nowrap;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
     overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    word-break: break-word;
 }
 
 .cart-item-meta {
@@ -323,7 +326,7 @@
     {% else %}
     <!-- EMPTY -->
     <div class="empty-cart">
-        <div class="icon"></div>
+        <div class="icon"><span class="material-symbols-outlined" style="font-size: 5rem; color: #cbd5e1;">remove_shopping_cart</span></div>
         <h2>Giỏ hàng trống</h2>
         <p>Bạn chưa có sản phẩm nào trong giỏ hàng.</p>
         <a href="{{ url_for('products') }}" class="btn btn-primary" style="display:inline-flex">

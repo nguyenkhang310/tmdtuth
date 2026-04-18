@@ -1,6 +1,7 @@
 from extensions import db
 from flask_login import UserMixin
-from datetime import datetime
+from datetime import datetime, timedelta
+import secrets
 
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
@@ -8,6 +9,26 @@ class User(db.Model, UserMixin):
     email = db.Column(db.String(150), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
     role = db.Column(db.String(50), default='user') # 'admin' or 'user'
+    reset_token = db.Column(db.String(100), nullable=True, unique=True)
+    reset_token_expires = db.Column(db.DateTime, nullable=True)
+
+    def generate_reset_token(self, expires_minutes: int = 30) -> str:
+        """Tạo token reset mật khẩu có thời hạn, lưu vào model."""
+        token = secrets.token_urlsafe(48)
+        self.reset_token = token
+        self.reset_token_expires = datetime.utcnow() + timedelta(minutes=expires_minutes)
+        return token
+
+    def clear_reset_token(self):
+        """Xóa token sau khi đã dùng."""
+        self.reset_token = None
+        self.reset_token_expires = None
+
+    def is_reset_token_valid(self) -> bool:
+        """Kiểm tra token còn hạn không."""
+        if not self.reset_token or not self.reset_token_expires:
+            return False
+        return datetime.utcnow() < self.reset_token_expires
     
     carts = db.relationship('Cart', backref='user', lazy=True)
     orders = db.relationship('Order', backref='user', lazy=True)

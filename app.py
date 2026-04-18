@@ -194,6 +194,26 @@ def ensure_order_schema():
     conn.close()
 
 
+def ensure_user_schema():
+    """Thêm cột reset_token vào bảng user nếu chưa có (dùng schema migration đơn giản)."""
+    db_path = os.path.join(app.instance_path, 'ecommerce.db')
+    if not os.path.exists(db_path):
+        return
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA table_info(user);")
+    cols = {row[1] for row in cursor.fetchall()}
+
+    if 'reset_token' not in cols:
+        cursor.execute("ALTER TABLE user ADD COLUMN reset_token VARCHAR(100)")
+    if 'reset_token_expires' not in cols:
+        cursor.execute("ALTER TABLE user ADD COLUMN reset_token_expires DATETIME")
+
+    conn.commit()
+    conn.close()
+
+
 def _hmac_sha256(secret: str, data: str) -> str:
     return hmac.new(secret.encode('utf-8'), data.encode('utf-8'), hashlib.sha256).hexdigest()
 
@@ -861,8 +881,8 @@ def checkout():
             # Handle guest checkout securely
             user = User.query.filter_by(email=guest_email).first()
             if user:
-                flash('Email này đã được đăng ký tài khoản. Vui lòng đăng nhập để tiếp tục mua hàng!', 'error')
-                return redirect(url_for('login'))
+                flash('Email này đã có tài khoản. Vui lòng đăng nhập — giỏ hàng của bạn sẽ được giữ nguyên!', 'error')
+                return redirect(url_for('login', next=url_for('checkout')))
 
             uname = f"guest_{uuid.uuid4().hex[:8]}"
             # Create a random password hash (user can later add real password if you implement it)
@@ -1304,11 +1324,16 @@ def login():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
     if request.method == 'POST':
-        login_id = request.form.get('login_id')
+        login_id = (request.form.get('login_id') or '').strip()
         password = request.form.get('password')
+        
+        # Tìm user theo email hoặc username không phân biệt chữ hoa, chữ thường
+        # Đảm bảo người dùng gõ sai hoa/thường vẫn tìm ra tài khoản (chuẩn UX/Security chống trùng lặp)
         user = User.query.filter(
-            (User.username == login_id) | (User.email == login_id)
+            (func.lower(User.username) == login_id.lower()) | 
+            (func.lower(User.email) == login_id.lower())
         ).first()
+        
         if user and check_password_hash(user.password_hash, password):
             remember_me = bool(request.form.get('remember'))
             login_user(user, remember=remember_me)
@@ -1318,18 +1343,23 @@ def login():
                 return redirect(next_page)
             return redirect(url_for('index'))
         else:
-            flash('Email hoặc mật khẩu không đúng.', 'error')
+            flash('Email/Tên đăng nhập hoặc mật khẩu không đúng.', 'error')
     return render_template('login.html')
 
 @app.route('/register', methods=['POST'])
 @limiter.limit("10 per minute")
 def register():
-    name = request.form.get('name')
-    email = request.form.get('email')
+    name = (request.form.get('name') or '').strip()
+    email = (request.form.get('email') or '').strip()
     password = request.form.get('password')
 
-    if User.query.filter_by(email=email).first():
+    # Kiểm tra trùng lập không phân biệt hoa thường để tránh tạo ra 2 tài khoản "Hana" và "hana"
+    if User.query.filter(func.lower(User.email) == email.lower()).first():
         flash('Email này đã được sử dụng. Vui lòng dùng email khác.', 'error')
+        return redirect(url_for('login') + '#register')
+        
+    if User.query.filter(func.lower(User.username) == name.lower()).first():
+        flash('Tên đăng nhập (Họ và tên) này đã được sử dụng. Vui lòng chọn tên khác hoặc thêm số phía sau.', 'error')
         return redirect(url_for('login') + '#register')
 
     new_user = User(
@@ -1348,6 +1378,70 @@ def logout():
     logout_user()
     flash('Đã đăng xuất thành công.', 'info')
     return redirect(url_for('index'))
+
+
+@app.route('/forgot-password', methods=['GET', 'POST'])
+@limiter.limit("10 per hour")
+def forgot_password():
+    """Tạo token reset mật khẩu và hiển thị link trực tiếp (demo mode — không cần SMTP)."""
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+
+    reset_link = None
+    if request.method == 'POST':
+        email = (request.form.get('email') or '').strip().lower()
+        if not email:
+            flash('Vui lòng nhập địa chỉ email.', 'error')
+        else:
+            user = User.query.filter(func.lower(User.email) == email).first()
+            if user:
+                token = user.generate_reset_token(expires_minutes=30)
+                db.session.commit()
+                reset_link = url_for('reset_password', token=token, _external=False)
+            # Luôn hiện thông báo thành công để tránh lộ email tồn tại (security best practice)
+            flash('Nếu email tồn tại trong hệ thống, liên kết đặt lại mật khẩu sẽ xuất hiện bên dưới.', 'info')
+
+    return render_template('forgot-password.html', reset_link=reset_link)
+
+
+@app.route('/reset-password/<token>', methods=['GET', 'POST'])
+@limiter.limit("20 per hour")
+def reset_password(token):
+    """Xác thực token và cho phép đặt lại mật khẩu."""
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+
+    user = User.query.filter_by(reset_token=token).first()
+
+    if not user or not user.is_reset_token_valid():
+        flash('Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn. Vui lòng thử lại.', 'error')
+        return redirect(url_for('forgot_password'))
+
+    if request.method == 'POST':
+        new_pw = request.form.get('password', '')
+        confirm_pw = request.form.get('confirm_password', '')
+
+        if len(new_pw) < 8:
+            flash('Mật khẩu phải có ít nhất 8 ký tự.', 'error')
+            return render_template('reset-password.html', token=token)
+
+        pw_pattern = re.compile(r'^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}$')
+        if not pw_pattern.match(new_pw):
+            flash('Mật khẩu cần có ít nhất 1 chữ HOA, 1 chữ thường và 1 chữ số.', 'error')
+            return render_template('reset-password.html', token=token)
+
+        if new_pw != confirm_pw:
+            flash('Xác nhận mật khẩu không khớp.', 'error')
+            return render_template('reset-password.html', token=token)
+
+        user.password_hash = generate_password_hash(new_pw, method='pbkdf2:sha256')
+        user.clear_reset_token()
+        db.session.commit()
+        flash('Đặt lại mật khẩu thành công! Vui lòng đăng nhập.', 'success')
+        return redirect(url_for('login'))
+
+    return render_template('reset-password.html', token=token)
+
 
 @app.route('/contact', methods=['GET', 'POST'])
 @limiter.limit("30 per hour")
@@ -1657,8 +1751,12 @@ def admin_add_coupon():
         flash('Giá trị coupon phải lớn hơn 0.', 'error')
         return redirect(url_for('admin_dashboard') + '?tab=marketing')
     if Coupon.query.filter_by(code=code).first():
-        flash('Mã coupon đã tồn tại.', 'error')
+        flash('Mã coupon đã tồn tại trong hệ thống.', 'error')
         return redirect(url_for('admin_dashboard') + '?tab=marketing')
+    if code in app.config.get('COUPONS', {}):
+        flash('Mã coupon này là mã mặc định của hệ thống, không thể tạo trùng.', 'error')
+        return redirect(url_for('admin_dashboard') + '?tab=marketing')
+
 
     max_uses = int(max_uses_raw) if max_uses_raw.isdigit() else None
     expires_at = None
@@ -1777,8 +1875,12 @@ def profile():
             if not check_password_hash(current_user.password_hash, current_pw):
                 flash('Mật khẩu hiện tại không đúng.', 'error')
                 return redirect(url_for('profile'))
-            if len(new_pw) < 6:
-                flash('Mật khẩu mới phải có ít nhất 6 ký tự.', 'error')
+            if len(new_pw) < 8:
+                flash('Mật khẩu mới phải có ít nhất 8 ký tự.', 'error')
+                return redirect(url_for('profile'))
+            pw_pattern = re.compile(r'^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}$')
+            if not pw_pattern.match(new_pw):
+                flash('Mật khẩu mới cần có ít nhất 1 chữ HOA, 1 chữ thường và 1 chữ số.', 'error')
                 return redirect(url_for('profile'))
             if new_pw != confirm_pw:
                 flash('Xác nhận mật khẩu không khớp.', 'error')
@@ -1798,6 +1900,7 @@ if __name__ == '__main__':
         db.create_all()
         ensure_db_schema()
         ensure_order_schema()
+        ensure_user_schema()
         missing_payment_env = _missing_payment_env_vars()
         if missing_payment_env and not _is_debug_mode:
             raise RuntimeError(f"Missing payment environment variables: {missing_payment_env}")
