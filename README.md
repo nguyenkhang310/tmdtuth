@@ -366,6 +366,80 @@ Thư mục <code>/templates</code> chứa các giao diện được phân tách 
 
 ---
 
-## 6. KẾT LUẬN
+## 6. HƯỚNG DẪN CÀI ĐẶT HỆ THỐNG (INSTALLATION GUIDE)
+
+Dự án này được thiết kế để dễ dàng cài đặt và vận hành trên cả hệ điều hành **Windows** và **macOS**. Hãy làm theo các bước dưới đây để khởi chạy nền tảng trên máy cá nhân của bạn.
+
+### Bước 1: Yêu cầu hệ thống cần chuẩn bị (Prerequisites)
+- Cài đặt **Python 3.8** trở lên. (Tải tại [python.org](https://www.python.org/downloads/)).
+- Đảm bảo bạn đã cài hệ quản trị Git (nếu clone từ Github).
+
+### Bước 2: Thiết lập môi trường ảo (Virtual Environment)
+Môi trường ảo giúp cô lập các thư viện của dự án này để không xung đột với các dự án Python khác trên máy tính của bạn. Mở Terminal (trên Mac) hoặc Command Prompt / PowerShell (trên Windows) và di chuyển vào thư mục dự án `tmdt_uth`.
+
+**Dành cho macOS / Linux:**
+```bash
+# Tạo môi trường ảo có tên là venv
+python3 -m venv venv
+
+# Kích hoạt môi trường ảo
+source venv/bin/activate
+```
+
+**Dành cho Windows:**
+```cmd
+# Tạo môi trường ảo
+python -m venv venv
+
+# Kích hoạt môi trường ảo bằng Command Prompt
+venv\Scripts\activate
+# Hoặc trên PowerShell: .\venv\Scripts\Activate.ps1
+```
+
+*(Dấu hiệu thành công: Dòng lệnh của bạn sẽ có tiền tố `(venv)` ở phía trước).*
+
+### Bước 3: Cài đặt thư viện phụ thuộc (Dependencies)
+```bash
+pip install -r requirements.txt
+```
+
+### Bước 4: Khởi tạo Dữ liệu mẫu (Database Seeding)
+Chỉ cần chạy lệnh này trong **lần đầu tiên** để hệ thống tự động tạo File Database ảo (`ecommerce.db`) và nhồi toàn bộ sản phẩm, danh mục, cấu hình hệ thống mẫu vào.
+```bash
+python seed.py
+```
+
+### Bước 5: Khởi chạy Máy chủ (Run the Server)
+```bash
+python app.py
+```
+Sau khi thấy dòng chữ `Running on http://127.0.0.1:5011`, hãy mở trình duyệt và truy cập vào đường link: **http://127.0.0.1:5011**
+
+---
+
+## 7. HƯỚNG DẪN SỬ DỤNG (USER GUIDE)
+
+### Dành cho Khách hàng (User Frontend):
+1. **Duyệt & Tìm kiếm:** Ngay tại trang chủ, bấm vào phần Sản phẩm để xem toàn bộ danh mục thời trang. Sử dụng thanh Tìm kiếm (Search Bar) bằng cách gõ từ khoá "áo sơ mi" hoặc "jean" để lọc.
+2. **Mua hàng (Giỏ hàng):** Bấm "Thêm vào giỏ" đối với các sản phẩm ưa thích. Hệ thống cho phép bạn mua hàng ngay cả khi là **Khách vãng lai (Guest)** chưa tạo tài khoản.
+3. **Thanh toán (Checkout):** Vào trang thanh toán, nhập thông tin liên lạc và chọn hình thức thanh toán. (Hỗ trợ COD trả sau hoặc thanh toán qua Ví MoMo/VNPAY bằng cách nhập tài khoản Sandbox/Mô phỏng).
+4. **Theo dõi đơn hàng & Tài khoản:** Nếu bấm Đăng ký tài khoản, tính năng "Đơn hàng của tôi" và "Danh sách yêu thích (Wishlist)" sẽ được mở khoá để bạn dễ dàng quản lý việc mua sắm sau này.
+
+### Dành cho Ban Quản Trị (Admin Backend):
+Tham số để đăng nhập tài khoản Quản trị cấp cao mẫu (đã được sinh ra tự động từ `seed.py`):
+- **Email/Username:** `admin`
+- **Mật khẩu:** `admin123`
+
+Sau khi đăng nhập tài khoản trên vào hệ thống, một nút **"Quản trị Admin"** sẽ xuất hiện trên thanh điều hướng Menu (Hoặc truy cập trực tiếp `http://127.0.0.1:5011/admin_dashboard`).
+Tại đây bạn có thể thao tác với 6 module quyền năng:
+1. **Tổng quan & Phân tích:** Xem biểu đồ chốt sales, doanh thu realtime tự động cập nhật mỗi khi có khách mua hàng.
+2. **Sản phẩm:** Cập nhật thông tin hàng hóa, tải ảnh/video mới, điều chỉnh lại giá Sale hoặc khai báo hết hàng. Tính năng "Gỡ/Xóa" đã được mã hóa làm sạch tự động an toàn cho người dùng cuối.
+3. **Đơn hàng:** Bảng điểu khiển giúp bạn duyệt Đơn chờ xử lý và chuyển trạng thái sang "Đang giao" hoặc "Hoàn thành".
+4. **Mã giảm giá (Marketing):** Tạo mã Voucher (Ví dụ siêu sale 50%) giới hạn cho 100 lượt dùng đầu tiên.
+5. **Liên hệ:** Đọc phản hồi, thư rác giải quyết trực tiếp từ nguồn feedback bên ngoài gửi vào.
+
+---
+
+## 8. KẾT LUẬN
 
 Hệ thống UTH Store là một nguyên bản mạnh mẽ, mang đặc thù một cơ cấu hoàn chỉnh trong hệ sinh thái ứng dụng Python Backend. Trục định tuyến mạch lạc kết hợp tính năng bảo mật toàn diện cho phép nền tảng dễ dàng trở thành tư liệu mẫu cao cấp cho mọi công tác nghiên cứu, luận văn hay phát triển thành Commercial System chính thống. Blueprint cấu trúc mở thuận tiện để tiếp tục triển khai Dockerization và Micro-service hóa trong lộ trình tương lai.

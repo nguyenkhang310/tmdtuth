@@ -580,10 +580,18 @@ def product_detail(product_id):
     product = Product.query.get_or_404(product_id)
     reviews = Review.query.filter_by(product_id=product_id).all()
     is_in_wishlist = False
+    can_review = False
     if current_user.is_authenticated:
         is_in_wishlist = WishlistItem.query.filter_by(user_id=current_user.id, product_id=product_id).first() is not None
+        if current_user.role != 'admin':
+            can_review = OrderItem.query.join(Order).filter(
+                Order.user_id == current_user.id,
+                Order.status == 'delivered',
+                OrderItem.product_id == product_id
+            ).first() is not None
+
     extra_images_list = json.loads(product.extra_images) if product.extra_images else []
-    return render_template('product-detail.html', product=product, reviews=reviews, is_in_wishlist=is_in_wishlist, extra_images_list=extra_images_list)
+    return render_template('product-detail.html', product=product, reviews=reviews, is_in_wishlist=is_in_wishlist, can_review=can_review, extra_images_list=extra_images_list)
 
 
 @app.route('/wishlist')
@@ -600,13 +608,13 @@ def wishlist_toggle(product_id):
         flash('Tài khoản quản trị không thể dùng danh sách yêu thích.', 'error')
         return redirect(url_for('product_detail', product_id=product_id))
     product = Product.query.get_or_404(product_id)
-    existed = WishlistItem.query.filter_by(user_id=current_user.id, product_id=product.id).first()
-    if existed:
-        db.session.delete(existed)
+    item = WishlistItem.query.filter_by(user_id=current_user.id, product_id=product_id).first()
+    if item:
+        db.session.delete(item)
         db.session.commit()
-        flash('Đã xóa sản phẩm khỏi danh sách yêu thích.', 'info')
+        flash('Đã bỏ sản phẩm khỏi danh sách yêu thích.', 'info')
     else:
-        db.session.add(WishlistItem(user_id=current_user.id, product_id=product.id))
+        db.session.add(WishlistItem(user_id=current_user.id, product_id=product_id))
         db.session.commit()
         flash('Đã thêm sản phẩm vào danh sách yêu thích.', 'success')
     return redirect(request.referrer or url_for('product_detail', product_id=product.id))
@@ -614,6 +622,21 @@ def wishlist_toggle(product_id):
 @app.route('/product/<int:product_id>/review', methods=['POST'])
 @login_required
 def add_review(product_id):
+    # Admin không được phép viết đánh giá sản phẩm
+    if current_user.role == 'admin':
+        flash('Tài khoản quản trị không thể viết đánh giá sản phẩm.', 'error')
+        return redirect(url_for('product_detail', product_id=product_id))
+        
+    has_bought = OrderItem.query.join(Order).filter(
+        Order.user_id == current_user.id,
+        Order.status == 'delivered',
+        OrderItem.product_id == product_id
+    ).first()
+    
+    if not has_bought:
+        flash('Bạn cần mua và nhận hàng thành công mới được phép đánh giá.', 'error')
+        return redirect(url_for('product_detail', product_id=product_id))
+    
     product = Product.query.get_or_404(product_id)
     rating = int(request.form.get('rating', 5))
     rating = max(1, min(5, rating))
@@ -637,6 +660,25 @@ def add_review(product_id):
     db.session.add(review)
     db.session.commit()
     flash('Cảm ơn bạn đã đánh giá sản phẩm!', 'success')
+    return redirect(url_for('product_detail', product_id=product_id))
+
+
+@app.route('/review/<int:review_id>/delete', methods=['POST'])
+@login_required
+def delete_review(review_id):
+    review = Review.query.get_or_404(review_id)
+    product_id = review.product_id
+    # Admin được xóa bất kỳ đánh giá nào; user chỉ xóa được đánh giá của mình
+    if current_user.role != 'admin' and review.user_id != current_user.id:
+        flash('Bạn không có quyền xóa đánh giá này.', 'error')
+        return redirect(url_for('product_detail', product_id=product_id))
+    db.session.delete(review)
+    db.session.commit()
+    flash('Đã xóa đánh giá thành công.', 'success')
+    # Nếu admin đang ở trang admin thì quay lại referrer
+    referrer = request.referrer
+    if referrer:
+        return redirect(referrer)
     return redirect(url_for('product_detail', product_id=product_id))
 
 @app.route('/cart')
@@ -816,15 +858,19 @@ def checkout():
 
 
         if is_guest:
-            # Create or reuse user by email, then merge guest cart into DB cart.
+            # Handle guest checkout securely
             user = User.query.filter_by(email=guest_email).first()
-            if not user:
-                uname = f"guest_{uuid.uuid4().hex[:8]}"
-                # Create a random password hash (user can later add real password if you implement it)
-                rand_pw = uuid.uuid4().hex + uuid.uuid4().hex
-                user = User(username=uname, email=guest_email, password_hash=generate_password_hash(rand_pw))
-                db.session.add(user)
-                db.session.commit()
+            if user:
+                flash('Email này đã được đăng ký tài khoản. Vui lòng đăng nhập để tiếp tục mua hàng!', 'error')
+                return redirect(url_for('login'))
+
+            uname = f"guest_{uuid.uuid4().hex[:8]}"
+            # Create a random password hash (user can later add real password if you implement it)
+            rand_pw = uuid.uuid4().hex + uuid.uuid4().hex
+            user = User(username=uname, email=guest_email, password_hash=generate_password_hash(rand_pw))
+            db.session.add(user)
+            db.session.commit()
+            
             login_user(user)
             _merge_session_cart_into_user_cart(user)
             active_cart = _get_or_create_user_cart(user.id)
@@ -1662,9 +1708,15 @@ def admin_delete_product(product_id):
         filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         if os.path.exists(filepath):
             os.remove(filepath)
+            
+    # Ngăn rác dữ liệu/crash trang web của người dùng bằng cách xoá sản phẩm khỏi giỏ hàng/wishlist
+    CartItem.query.filter_by(product_id=product.id).delete()
+    WishlistItem.query.filter_by(product_id=product.id).delete()
+    Review.query.filter_by(product_id=product.id).delete()
+    
     db.session.delete(product)
     db.session.commit()
-    flash('Đã xóa sản phẩm.', 'info')
+    flash('Đã xóa sản phẩm và cập nhật giỏ hàng khách hàng.', 'info')
     return redirect(url_for('admin_dashboard') + '?tab=products')
 
 

@@ -726,7 +726,7 @@
 <!-- ========== CATEGORIES VISUAL STRIP ========== -->
 <section class="section" style="padding:5rem 0">
     <div class="section-inner">
-        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;margin-bottom:2.5rem">
+        <div class="reveal" style="display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;margin-bottom:2.5rem">
             <div>
                 <p class="section-eyebrow">Danh mục</p>
                 <h2 class="section-headline">Khám phá <em>phong cách</em></h2>
@@ -811,7 +811,7 @@
 
 <section class="section">
     <div class="section-inner">
-        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;margin-bottom:2.5rem">
+        <div class="reveal" style="display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;margin-bottom:2.5rem">
             <div>
                 <p class="section-eyebrow">Mới nhất</p>
                 <h2 class="section-headline">Hàng <em>mới về</em></h2>
@@ -823,9 +823,9 @@
         </div>
 
         {% if new_products %}
-        <div class="products-grid">
+        <div class="products-grid" id="new-arrivals-grid">
             {% for product in new_products %}
-            <div class="pcard">
+            <div class="pcard reveal">
                 <a class="pcard-link" href="{{ url_for('product_detail', product_id=product.id) }}">
                     <div class="pcard-img">
                         <img src="{{ product.image_url }}" alt="{{ product.name }}" loading="lazy">
@@ -881,7 +881,7 @@
 </div>
 
 <!-- ========== SALE RIBBON ========== -->
-<div class="sale-ribbon">
+<div class="sale-ribbon reveal">
     <div class="sale-ribbon-text">
         <p class="eyebrow">✦ Flash Sale — Có hạn</p>
         <h2>Sale lên tới<br><em>50% off</em></h2>
@@ -903,7 +903,7 @@
 <!-- ========== BESTSELLERS ========== -->
 <section class="section" style="background:#f9f7f4">
     <div class="section-inner">
-        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;margin-bottom:2.5rem">
+        <div class="reveal" style="display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;margin-bottom:2.5rem">
             <div>
                 <p class="section-eyebrow">Most Loved</p>
                 <h2 class="section-headline">Bán <em>chạy nhất</em></h2>
@@ -917,7 +917,7 @@
         {% if sale_products %}
         <div class="bs-grid">
             {% for product in sale_products %}
-            <a href="{{ url_for('product_detail', product_id=product.id) }}" class="bs-card">
+            <a href="{{ url_for('product_detail', product_id=product.id) }}" class="bs-card reveal">
                 <div class="bs-rank">#{{ loop.index }}</div>
                 <div class="bs-img">
                     <img src="{{ product.image_url }}" alt="{{ product.name }}" loading="lazy">
@@ -940,7 +940,7 @@
 <!-- ========== FEATURES ========== -->
 <section style="background:white">
     <div class="section-inner" style="padding:0">
-        <div class="features-strip">
+        <div class="features-strip reveal">
             <div class="feature-item">
                 <div class="feature-icon">
                     <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24">local_shipping</span>

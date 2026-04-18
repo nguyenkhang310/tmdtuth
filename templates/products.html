@@ -476,7 +476,7 @@
         <div class="product-grid">
             {% if products %}
                 {% for product in products %}
-                <div class="product-card">
+                <div class="product-card reveal">
                     <a class="product-card-link" href="{{ url_for('product_detail', product_id=product.id) }}" aria-label="{{ product.name }}">
                         <div class="product-img-wrap">
                             <img src="{{ product.image_url }}" alt="{{ product.name }}" loading="lazy">

@@ -235,9 +235,9 @@
             <div class="order-preview">
                 {% for item in preview_items %}
                 <img class="order-preview-img"
-                     src="{{ item.product.image_url or url_for('static', filename='placeholder.png') }}"
-                     alt="{{ item.product.name }}"
-                     title="{{ item.product.name }} x{{ item.quantity }}">
+                     src="{{ item.product.image_url if item.product and item.product.image_url else url_for('static', filename='placeholder.png') }}"
+                     alt="{{ item.product.name if item.product else 'Sản phẩm đã gỡ' }}"
+                     title="{{ item.product.name if item.product else 'Sản phẩm đã gỡ' }} x{{ item.quantity }}">
                 {% endfor %}
                 {% if extra > 0 %}
                 <div class="order-preview-more">+{{ extra }}</div>

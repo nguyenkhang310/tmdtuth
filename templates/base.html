@@ -13,6 +13,121 @@
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
     <style>
+        /* ===== PAGE TRANSITION SYSTEM ===== */
+        /* Progress Bar */
+        #page-progress {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 3px;
+            width: 0%;
+            z-index: 9999;
+            background: linear-gradient(90deg, var(--primary), var(--gold), var(--primary-light));
+            background-size: 200% 100%;
+            border-radius: 0 2px 2px 0;
+            transition: width 0.15s ease-out;
+            animation: shimmer-bar 1.5s infinite linear;
+            box-shadow: 0 0 10px rgba(201,168,76,0.6);
+        }
+        @keyframes shimmer-bar {
+            0% { background-position: 0% 0%; }
+            100% { background-position: 200% 0%; }
+        }
+
+        /* Page Transition Overlay */
+        #page-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 9998;
+            background: var(--bg);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #page-overlay.exiting {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        /* Page Enter Animation */
+        .page-wrapper {
+            animation: pageEnter 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+        @keyframes pageEnter {
+            from {
+                opacity: 0;
+                transform: translateY(16px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Ripple Effect */
+        .ripple-container {
+            position: relative;
+            overflow: hidden;
+        }
+        .ripple {
+            position: absolute;
+            border-radius: 50%;
+            transform: scale(0);
+            animation: rippleEffect 0.6s linear;
+            pointer-events: none;
+        }
+        @keyframes rippleEffect {
+            to {
+                transform: scale(4);
+                opacity: 0;
+            }
+        }
+
+        /* Lazy Image Fade */
+        img.lazy-fade {
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+        img.lazy-fade.loaded {
+            opacity: 1;
+        }
+
+        /* Scroll-reveal animations — Progressive Enhancement */
+        /* Only apply if JS has added .js-anim-ready to body */
+        body.js-anim-ready .reveal {
+            opacity: 0;
+            transform: translateY(24px);
+            transition: opacity 0.55s cubic-bezier(0.22,1,0.36,1), transform 0.55s cubic-bezier(0.22,1,0.36,1);
+            will-change: opacity, transform;
+        }
+        body.js-anim-ready .reveal.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        /* Fallback: if JS not ready, show everything */
+        body:not(.js-anim-ready) .reveal {
+            opacity: 1;
+            transform: none;
+        }
+
+        /* GPU-accelerated hover on cards */
+        [class*="card"], [class*="-card"] {
+            will-change: transform;
+            backface-visibility: hidden;
+        }
+
+        /* Smooth focus ring */
+        :focus-visible {
+            outline: 2.5px solid var(--primary);
+            outline-offset: 3px;
+            border-radius: 4px;
+        }
+
+        /* Navbar transition */
+        .navbar {
+            transition: box-shadow 0.3s ease, backdrop-filter 0.3s ease;
+        }
+        /* ===================================== */
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         
         :root {
@@ -983,6 +1098,214 @@ document.querySelectorAll('.navbar-search input[name="q"]').forEach(input => {
         }
     });
 });
+</script>
+
+<!-- ===== PROFESSIONAL PAGE TRANSITIONS ===== -->
+<div id="page-overlay"></div>
+<div id="page-progress" style="display:none"></div>
+
+<script>
+(function() {
+    'use strict';
+
+    /* ---- 1. PROGRESS BAR ---- */
+    const bar = document.getElementById('page-progress');
+    let barTimer = null;
+    let barValue = 0;
+    let fakeTick = null;
+
+    function barStart() {
+        bar.style.display = 'block';
+        barValue = 0;
+        bar.style.transition = 'none';
+        bar.style.width = '0%';
+        // Fake incremental progress
+        clearInterval(fakeTick);
+        fakeTick = setInterval(() => {
+            if (barValue < 80) {
+                barValue += Math.random() * 8 + 2;
+                barValue = Math.min(barValue, 82);
+                bar.style.transition = 'width 0.25s ease';
+                bar.style.width = barValue + '%';
+            }
+        }, 200);
+    }
+
+    function barFinish() {
+        clearInterval(fakeTick);
+        bar.style.transition = 'width 0.2s ease';
+        bar.style.width = '100%';
+        setTimeout(() => {
+            bar.style.transition = 'opacity 0.3s';
+            bar.style.opacity = '0';
+            setTimeout(() => {
+                bar.style.display = 'none';
+                bar.style.width = '0%';
+                bar.style.opacity = '1';
+            }, 300);
+        }, 250);
+    }
+
+    /* ---- 2. PAGE EXIT OVERLAY ---- */
+    const overlay = document.getElementById('page-overlay');
+
+    function triggerExit(href, target) {
+        // Don't transition for same-page anchors, external links, or non-HTTP
+        if (!href || href.startsWith('#') || href.startsWith('javascript') ||
+            href.startsWith('mailto') || href.startsWith('tel') ||
+            (target && target !== '_self')) return false;
+        // Skip if same page
+        try {
+            const dest = new URL(href, location.href);
+            if (dest.origin !== location.origin) return false;
+        } catch(e) { return false; }
+        return true;
+    }
+
+    document.addEventListener('click', function(e) {
+        // Find the closest <a> tag
+        const a = e.target.closest('a[href]');
+        if (!a) return;
+        const href = a.getAttribute('href');
+        const target = a.getAttribute('target');
+        if (!triggerExit(href, target)) return;
+        // Modifiers = open in new tab
+        if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || e.button !== 0) return;
+
+        e.preventDefault();
+        barStart();
+        overlay.classList.add('exiting');
+
+        setTimeout(() => {
+            window.location.href = href;
+        }, 220);
+    }, true);
+
+    // Form submissions: show bar
+    document.addEventListener('submit', function(e) {
+        const form = e.target;
+        if (form.method && form.method.toLowerCase() === 'get') {
+            // GET forms (search, filters) get the bar too
+            barStart();
+        } else if (form.method && form.method.toLowerCase() === 'post') {
+            barStart();
+        }
+    });
+
+    // When page finishes loading: finish bar and remove overlay
+    window.addEventListener('pageshow', function() {
+        overlay.classList.remove('exiting');
+        barFinish();
+    });
+
+    /* ---- 3. BACK/FORWARD (popstate) ---- */
+    window.addEventListener('popstate', function() {
+        barStart();
+        overlay.classList.add('exiting');
+    });
+
+    /* ---- 4. RIPPLE EFFECT on buttons & links ---- */
+    function addRipple(e, el) {
+        const rect = el.getBoundingClientRect();
+        const size = Math.max(rect.width, rect.height);
+        const x = e.clientX - rect.left - size / 2;
+        const y = e.clientY - rect.top - size / 2;
+        const ripple = document.createElement('span');
+        ripple.className = 'ripple';
+        ripple.style.cssText = `width:${size}px;height:${size}px;left:${x}px;top:${y}px;background:rgba(255,255,255,0.3);`;
+        el.appendChild(ripple);
+        ripple.addEventListener('animationend', () => ripple.remove());
+    }
+
+    // Apply ripple to .btn elements and navbar action buttons
+    document.addEventListener('click', function(e) {
+        const el = e.target.closest('.btn, .navbar-icon-btn, .navbar-user-btn');
+        if (!el) return;
+        if (!el.classList.contains('ripple-container')) {
+            el.classList.add('ripple-container');
+            el.style.position = el.style.position || 'relative';
+            el.style.overflow = 'hidden';
+        }
+        addRipple(e, el);
+    });
+
+    /* ---- 5. LAZY IMAGE FADE-IN ---- */
+    function initLazyFade() {
+        const imgs = document.querySelectorAll('img:not(.no-fade)');
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const img = entry.target;
+                    if (img.complete) {
+                        img.classList.add('loaded');
+                    } else {
+                        img.onload = () => img.classList.add('loaded');
+                        img.onerror = () => img.classList.add('loaded');
+                    }
+                    img.classList.add('lazy-fade');
+                    if (img.complete) img.classList.add('loaded');
+                    observer.unobserve(img);
+                }
+            });
+        }, { rootMargin: '100px' });
+        imgs.forEach(img => observer.observe(img));
+    }
+
+    /* ---- 6. SCROLL REVEAL with smart stagger ---- */
+    function initReveal() {
+        const els = document.querySelectorAll('.reveal');
+        if (!els.length) return;
+
+        const obs = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+                if (entry.isIntersecting) {
+                    const el = entry.target;
+                    // Compute position-based stagger within its parent grid
+                    const siblings = Array.from(el.parentElement.children).filter(c => c.classList.contains('reveal'));
+                    const idx = siblings.indexOf(el);
+                    el.style.transitionDelay = Math.min(idx * 0.07, 0.42) + 's';
+                    el.classList.add('visible');
+                    obs.unobserve(el);
+                }
+            });
+        }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+
+        els.forEach(el => obs.observe(el));
+    }
+
+    /* ---- 7. Navbar scroll shrink ---- */
+    function initNavbarScroll() {
+        const navbar = document.querySelector('.navbar');
+        if (!navbar) return;
+        let lastY = 0;
+        window.addEventListener('scroll', () => {
+            const y = window.scrollY;
+            if (y > 80) {
+                navbar.style.boxShadow = '0 4px 24px rgba(0,0,0,0.12)';
+                navbar.style.backdropFilter = 'blur(28px)';
+            } else {
+                navbar.style.boxShadow = '0 2px 20px rgba(0,0,0,0.08)';
+                navbar.style.backdropFilter = 'blur(20px)';
+            }
+            lastY = y;
+        }, { passive: true });
+    }
+
+    function startAnimations() {
+        // Add class FIRST to activate CSS, then immediately observe
+        document.body.classList.add('js-anim-ready');
+        initLazyFade();
+        initReveal();
+        initNavbarScroll();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', startAnimations);
+    } else {
+        startAnimations();
+    }
+
+})();
 </script>
 {% block extra_scripts %}{% endblock %}
 </body>
