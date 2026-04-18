@@ -8,5 +8,5 @@ SQLAlchemy==2.0.31
 Werkzeug==3.0.3
 Jinja2==3.1.4
 requests==2.32.3
-redis==7.4.0
+redis
 python-dotenv==1.0.1

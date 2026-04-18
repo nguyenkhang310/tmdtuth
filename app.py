@@ -1,3 +1,4 @@
+from __future__ import annotations
 import os
 from dotenv import load_dotenv
 load_dotenv(override=True)
@@ -82,9 +83,9 @@ app.config['SHOP_INFO'] = {
 
 # Payment config (prefer env vars in production)
 app.config['BANK_TRANSFER_INFO'] = os.environ.get('BANK_TRANSFER_INFO') or (
-    "Ngân hàng: (cập nhật)\n"
-    "Chủ TK: (cập nhật)\n"
-    "STK: (cập nhật)\n"
+    "Ngân hàng: MB Bank\n"
+    "Chủ TK: Đỗ Hữu Huân\n"
+    "STK: 01237890\n"
     "Nội dung: UTH{{order_id}}"
 )
 
@@ -113,12 +114,21 @@ app.config['COUPONS'] = {
 def jinja_enumerate(iterable, start=0):
     return enumerate(iterable, start=start)
 
+@app.template_filter('fromjson')
+def jinja_fromjson(value):
+    if not value:
+        return []
+    try:
+        return json.loads(value)
+    except Exception:
+        return []
+
 
 # Upload config
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'static', 'uploads')
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'mp4', 'mov', 'avi'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10MB max
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -141,6 +151,14 @@ def ensure_db_schema():
             "UPDATE product SET created_at = ? WHERE created_at IS NULL",
             (timestamp,)
         )
+    if 'extra_images' not in existing_columns:
+        cursor.execute("ALTER TABLE product ADD COLUMN extra_images TEXT")
+    if 'video_url' not in existing_columns:
+        cursor.execute("ALTER TABLE product ADD COLUMN video_url VARCHAR(500)")
+    if 'sizes' not in existing_columns:
+        cursor.execute("ALTER TABLE product ADD COLUMN sizes TEXT")
+    if 'subcategory' not in existing_columns:
+        cursor.execute("ALTER TABLE product ADD COLUMN subcategory VARCHAR(100)")
 
     conn.commit()
     conn.close()
@@ -465,6 +483,34 @@ def sitemap_xml():
     resp.headers["Content-Type"] = "application/xml; charset=utf-8"
     return resp
 
+@app.route('/api/search')
+def api_search():
+    q = request.args.get('q', '').strip()
+    if not q:
+        return jsonify([])
+    
+    q_lower = q.lower()
+    q_cap = q.capitalize()
+    q_upper = q.upper()
+    
+    products = Product.query.filter(
+        or_(
+            Product.name.contains(q_lower),
+            Product.name.contains(q_cap),
+            Product.name.contains(q_upper)
+        )
+    ).order_by(Product.id.desc()).limit(6).all()
+    
+    results = []
+    for p in products:
+        results.append({
+            'name': p.name,
+            'price': "{:,.0f}đ".format(p.price),
+            'image_url': p.image_url,
+            'url': url_for('product_detail', product_id=p.id)
+        })
+    return jsonify(results)
+
 @app.route('/products')
 def products():
     query = Product.query
@@ -472,6 +518,7 @@ def products():
     category_slug = request.args.get('category')
     sale = request.args.get('sale')
     search_q = (request.args.get('q') or '').strip()
+    sub = (request.args.get('sub') or '').strip()  # subcategory filter
     sort = request.args.get('sort', 'newest')
     min_price = request.args.get('min_price', type=float)
     max_price = request.args.get('max_price', type=float)
@@ -500,15 +547,30 @@ def products():
     per_page = 12
 
     if search_q:
-        tokens = [t for t in search_q.split() if t]
-        for token in tokens:
-            term = f"%{token}%"
-            query = query.filter(
-                or_(
-                    Product.name.ilike(term),
-                    Product.description.ilike(term),
-                )
+        q_lower = search_q.lower()
+        q_cap = search_q.capitalize()
+        q_upper = search_q.upper()
+        
+        query = query.filter(
+            or_(
+                Product.name.contains(q_lower),
+                Product.name.contains(q_cap),
+                Product.name.contains(q_upper)
             )
+        )
+
+    if sub:
+        sub_lower = sub.lower()
+        sub_cap = sub.capitalize()
+        sub_upper = sub.upper()
+        query = query.filter(
+            or_(
+                Product.subcategory == sub,
+                Product.name.contains(sub_lower),
+                Product.name.contains(sub_cap),
+                Product.name.contains(sub_upper)
+            )
+        )
 
     pagination = db.paginate(query, page=page, per_page=per_page, error_out=False)
     return render_template('products.html', products=pagination.items, pagination=pagination)
@@ -520,7 +582,8 @@ def product_detail(product_id):
     is_in_wishlist = False
     if current_user.is_authenticated:
         is_in_wishlist = WishlistItem.query.filter_by(user_id=current_user.id, product_id=product_id).first() is not None
-    return render_template('product-detail.html', product=product, reviews=reviews, is_in_wishlist=is_in_wishlist)
+    extra_images_list = json.loads(product.extra_images) if product.extra_images else []
+    return render_template('product-detail.html', product=product, reviews=reviews, is_in_wishlist=is_in_wishlist, extra_images_list=extra_images_list)
 
 
 @app.route('/wishlist')
@@ -533,6 +596,9 @@ def wishlist():
 @app.route('/wishlist/toggle/<int:product_id>', methods=['POST'])
 @login_required
 def wishlist_toggle(product_id):
+    if current_user.role == 'admin':
+        flash('Tài khoản quản trị không thể dùng danh sách yêu thích.', 'error')
+        return redirect(url_for('product_detail', product_id=product_id))
     product = Product.query.get_or_404(product_id)
     existed = WishlistItem.query.filter_by(user_id=current_user.id, product_id=product.id).first()
     if existed:
@@ -575,6 +641,9 @@ def add_review(product_id):
 
 @app.route('/cart')
 def cart():
+    if current_user.is_authenticated and current_user.role == 'admin':
+        flash('Tài khoản quản trị không thể mua sắm. Vui lòng dùng tài khoản thường.', 'error')
+        return redirect(url_for('admin_dashboard'))
     if current_user.is_authenticated:
         active_cart = _get_or_create_user_cart(current_user.id)
         active_coupon_code = session.get('coupon_code')
@@ -607,6 +676,9 @@ def apply_coupon():
 
 @app.route('/cart/add/<int:product_id>', methods=['POST'])
 def add_to_cart(product_id):
+    if current_user.is_authenticated and current_user.role == 'admin':
+        flash('Tài khoản quản trị không thể mua sắm.', 'error')
+        return redirect(url_for('product_detail', product_id=product_id))
     quantity = int(request.form.get('quantity', 1))
     if quantity < 1:
         quantity = 1
@@ -691,13 +763,16 @@ def remove_from_cart(item_id):
 
 @app.route('/checkout', methods=['GET', 'POST'])
 def checkout():
+    if current_user.is_authenticated and current_user.role == 'admin':
+        flash('Tài khoản quản trị không thể mua sắm. Vui lòng dùng tài khoản thường.', 'error')
+        return redirect(url_for('admin_dashboard'))
     if current_user.is_authenticated:
         active_cart = _get_or_create_user_cart(current_user.id)
         is_guest = False
     else:
         active_cart = _build_guest_cart_view(_session_cart_get())
         is_guest = True
-    if not active_cart or not getattr(active_cart, 'items', None):
+    if not active_cart or len(list(active_cart.items)) == 0:
         flash('Giỏ hàng của bạn đang trống.', 'error')
         return redirect(url_for('cart'))
     coupon_code = session.get('coupon_code')
@@ -784,7 +859,12 @@ def checkout():
         db.session.commit()
         flash('Đã tạo đơn hàng thành công!', 'success')
         return redirect(url_for('order_detail', order_id=order.id))
-    return render_template('checkout.html', cart=active_cart, is_guest=is_guest, totals=totals_preview, coupon_code=coupon_code)
+    
+    response = make_response(render_template('checkout.html', cart=active_cart, is_guest=is_guest, totals=totals_preview, coupon_code=coupon_code))
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '-1'
+    return response
 
 
 @app.route('/order/<int:order_id>')
@@ -1390,27 +1470,123 @@ def admin_add_product():
     old_price_str = request.form.get('old_price', '')
     old_price = float(old_price_str) if old_price_str else None
     description = request.form.get('description', '')
-    category_id = int(request.form.get('category_id', 1))
+    
+    category_action = request.form.get('category_action', '1|')
+    cat_parts = category_action.split('|')
+    category_id = int(cat_parts[0])
+    subcategory = cat_parts[1] if len(cat_parts) > 1 and cat_parts[1] else None
+
     is_new = bool(request.form.get('is_new'))
     is_on_sale = bool(request.form.get('is_on_sale'))
+    stock = int(request.form.get('stock', 100))
 
-    # Xử lý upload ảnh: ưu tiên file upload, nếu không thì dùng URL
+    # Xử lý sizes tùy chỉnh
+    sizes_raw = request.form.get('sizes_input', '').strip()
+    sizes_list = []
+    if sizes_raw:
+        sizes_list = [s.strip() for s in sizes_raw.replace('\n', ',').split(',') if s.strip()]
+    sizes_json = json.dumps(sizes_list, ensure_ascii=False) if sizes_list else None
+
+    # Xử lý upload ảnh (tối đa 5 ảnh)
     image_url = request.form.get('image_url', '')
-    file = request.files.get('image_file')
-    if file and file.filename and allowed_file(file.filename):
-        ext = file.filename.rsplit('.', 1)[1].lower()
-        filename = f"{uuid.uuid4().hex}.{ext}"
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-        image_url = url_for('static', filename=f'uploads/{filename}')
+    files = request.files.getlist('image_files')
+    extra_urls = []
+    
+    # Process multiple image files
+    for file in files:
+        if file and file.filename and allowed_file(file.filename):
+            ext = file.filename.rsplit('.', 1)[1].lower()
+            filename = f"{uuid.uuid4().hex}.{ext}"
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            url = url_for('static', filename=f'uploads/{filename}')
+            if not image_url:
+                image_url = url
+            else:
+                extra_urls.append(url)
+                
+    # Xử lý upload video
+    video_url = request.form.get('video_url', '')
+    video_file = request.files.get('video_file')
+    if video_file and video_file.filename and allowed_file(video_file.filename):
+        ext = video_file.filename.rsplit('.', 1)[1].lower()
+        filename = f"vid_{uuid.uuid4().hex}.{ext}"
+        video_file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        video_url = url_for('static', filename=f'uploads/{filename}')
+
+    # Giới hạn mảng ảnh phụ (tối đa 8 ảnh phụ + 1 ảnh chính = 9)
+    extra_urls = extra_urls[:8]
+    extra_images_json = json.dumps(extra_urls) if extra_urls else None
 
     product = Product(
         name=name, price=price, old_price=old_price,
-        image_url=image_url, description=description,
-        category_id=category_id, is_new=is_new, is_on_sale=is_on_sale
+        image_url=image_url, extra_images=extra_images_json, video_url=video_url,
+        description=description, sizes=sizes_json,
+        category_id=category_id, subcategory=subcategory, is_new=is_new, is_on_sale=is_on_sale, stock=stock
     )
     db.session.add(product)
     db.session.commit()
     flash(f'Đã thêm sản phẩm "{name}" thành công!', 'success')
+    return redirect(url_for('admin_dashboard') + '?tab=products')
+
+
+@app.route('/admin/product/edit/<int:product_id>', methods=['POST'])
+@login_required
+def admin_edit_product(product_id):
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+
+    product = Product.query.get_or_404(product_id)
+
+    product.name = request.form.get('name', product.name).strip()
+    product.price = float(request.form.get('price', product.price) or 0)
+    old_price_str = request.form.get('old_price', '').strip()
+    product.old_price = float(old_price_str) if old_price_str else None
+    product.description = request.form.get('description', '').strip()
+    
+    category_action = request.form.get('category_action', f"{product.category_id}|{product.subcategory or ''}")
+    cat_parts = category_action.split('|')
+    product.category_id = int(cat_parts[0])
+    product.subcategory = cat_parts[1] if len(cat_parts) > 1 and cat_parts[1] else None
+    
+    product.stock = int(request.form.get('stock', product.stock or 100))
+    product.is_new = bool(request.form.get('is_new'))
+    product.is_on_sale = bool(request.form.get('is_on_sale'))
+
+    # Update image if new ones uploaded
+    files = request.files.getlist('image_files')
+    extra_urls = []
+    has_new_images = False
+    
+    for file in files:
+        if file and file.filename and allowed_file(file.filename):
+            ext = file.filename.rsplit('.', 1)[1].lower()
+            filename = f"{uuid.uuid4().hex}.{ext}"
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            url = url_for('static', filename=f'uploads/{filename}')
+            if not has_new_images:
+                product.image_url = url
+                has_new_images = True
+            else:
+                extra_urls.append(url)
+    
+    if extra_urls:
+        product.extra_images = json.dumps(extra_urls)
+
+    # Allow setting a direct URL if provided
+    direct_image_url = request.form.get('direct_image_url', '').strip()
+    if direct_image_url:
+        product.image_url = direct_image_url
+
+    # Sizes
+    sizes_raw = request.form.get('sizes_input', '').strip()
+    if sizes_raw:
+        sizes_list = [s.strip() for s in sizes_raw.replace('\n', ',').split(',') if s.strip()]
+        product.sizes = json.dumps(sizes_list, ensure_ascii=False) if sizes_list else None
+    else:
+        product.sizes = None
+
+    db.session.commit()
+    flash(f'Đã cập nhật sản phẩm "{product.name}" thành công!', 'success')
     return redirect(url_for('admin_dashboard') + '?tab=products')
 
 

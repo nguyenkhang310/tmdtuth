@@ -64,7 +64,7 @@
 }
 
 .product-title {
-    font-family: 'Playfair Display', serif;
+    font-family: inherit;
     font-size: 2.25rem;
     font-weight: 700;
     line-height: 1.2;
@@ -150,43 +150,125 @@
 }
 
 /* SIZE SELECT */
-.size-label {
-    font-size: 0.875rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text);
-    margin-bottom: 0.75rem;
+.size-section {
+    margin-bottom: 1.5rem;
+}
+
+.size-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    margin-bottom: 0.875rem;
 }
+
+.size-header-left {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.size-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text);
+}
+
+.size-selected-badge {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--primary);
+    background: rgba(10,92,54,0.08);
+    padding: 2px 10px;
+    border-radius: 999px;
+    transition: all 0.2s;
+    display: none;
+}
+.size-selected-badge.show { display: inline-block; }
+
+.size-guide-link {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    font-weight: 400;
+    cursor: pointer;
+    transition: color 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+.size-guide-link:hover { color: var(--primary); }
 
 .size-grid {
     display: flex;
     gap: 0.5rem;
     flex-wrap: wrap;
-    margin-bottom: 1.5rem;
+    margin-bottom: 0;
 }
 
 .size-btn {
-    width: 48px;
-    height: 48px;
-    border-radius: 10px;
-    border: 2px solid var(--border);
-    background: white;
-    font-size: 0.875rem;
-    font-weight: 700;
+    min-width: 52px;
+    height: 44px;
+    padding: 0 0.875rem;
+    border-radius: 6px;
+    border: 1.5px solid #d1d5db;
+    background: #fafafa;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #374151;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.18s ease;
     font-family: inherit;
+    letter-spacing: 0.02em;
+    position: relative;
+    overflow: hidden;
 }
 
-.size-btn:hover,
+.size-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--primary);
+    transform: scale(0);
+    border-radius: inherit;
+    transition: transform 0.2s ease;
+    z-index: 0;
+}
+
+.size-btn span { position: relative; z-index: 1; }
+
+.size-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: white;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(10,92,54,0.15);
+}
+
 .size-btn.active {
     border-color: var(--primary);
     background: var(--primary);
     color: white;
+    box-shadow: 0 4px 14px rgba(10,92,54,0.25);
+    transform: translateY(-1px);
+}
+
+.size-onesize {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    color: white;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: none;
+    box-shadow: 0 4px 14px rgba(10,92,54,0.2);
 }
 
 /* QTY */
@@ -285,7 +367,7 @@
     box-shadow:0 2px 8px rgba(0,0,0,0.06);
 }
 .details-title{
-    font-family:'Playfair Display',serif;
+    font-family:inherit;
     font-size:1.35rem;
     font-weight:800;
     margin-bottom:1rem;
@@ -298,7 +380,7 @@
 }
 
 .reviews-title {
-    font-family: 'Playfair Display', serif;
+    font-family: inherit;
     font-size: 1.75rem;
     font-weight: 700;
     margin-bottom: 2rem;
@@ -426,8 +508,45 @@
     <div class="detail-grid">
         <!-- GALLERY -->
         <div>
-            <div class="gallery-main">
-                <img src="{{ product.image_url }}" alt="{{ product.name }}">
+            <style>
+                .gallery-nav:hover { background: #fff !important; box-shadow: 0 4px 10px rgba(0,0,0,0.3) !important; }
+            </style>
+            <div class="gallery-main" id="galleryMain" style="position:relative">
+                {% if product.video_url %}
+                <video id="mainVideo" src="{{ product.video_url }}" controls style="display:none;width:100%;height:100%;object-fit:cover;"></video>
+                {% endif %}
+                <img id="mainImage" src="{{ product.image_url }}" alt="{{ product.name }}" style="display:block;">
+                
+                <button class="gallery-nav prev" id="btnPrevMedia" onclick="navigateMedia(-1)" style="position:absolute;top:50%;left:10px;transform:translateY(-50%);background:rgba(255,255,255,0.8);border:none;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 5px rgba(0,0,0,0.2);z-index:10;transition:0.2s;">
+                    <span class="material-symbols-outlined">chevron_left</span>
+                </button>
+                <button class="gallery-nav next" id="btnNextMedia" onclick="navigateMedia(1)" style="position:absolute;top:50%;right:10px;transform:translateY(-50%);background:rgba(255,255,255,0.8);border:none;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 5px rgba(0,0,0,0.2);z-index:10;transition:0.2s;">
+                    <span class="material-symbols-outlined">chevron_right</span>
+                </button>
+            </div>
+            
+            <div class="gallery-thumbs" style="display:flex;gap:10px;margin-top:1rem;overflow-x:auto;padding-bottom:0.5rem">
+                <!-- Thumbnail 1 (Main Image) -->
+                {% if product.image_url %}
+                <div class="thumb-item active" style="width:70px;height:70px;border-radius:10px;overflow:hidden;cursor:pointer;border:2px solid var(--primary);flex-shrink:0" onclick="changeMainMedia('image', '{{ product.image_url }}', this)">
+                    <img src="{{ product.image_url }}" style="width:100%;height:100%;object-fit:cover;">
+                </div>
+                {% endif %}
+                
+                <!-- Extra Images -->
+                {% for img in extra_images_list %}
+                <div class="thumb-item" style="width:70px;height:70px;border-radius:10px;overflow:hidden;cursor:pointer;border:2px solid transparent;flex-shrink:0" onclick="changeMainMedia('image', '{{ img }}', this)">
+                    <img src="{{ img }}" style="width:100%;height:100%;object-fit:cover;">
+                </div>
+                {% endfor %}
+                
+                <!-- Video Thumb -->
+                {% if product.video_url %}
+                <div class="thumb-item" style="width:70px;height:70px;border-radius:10px;overflow:hidden;cursor:pointer;border:2px solid transparent;flex-shrink:0;position:relative;background:#000" onclick="changeMainMedia('video', '{{ product.video_url }}', this)">
+                    <video src="{{ product.video_url }}" style="width:100%;height:100%;object-fit:cover;opacity:0.6"></video>
+                    <span class="material-symbols-outlined" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:white;font-size:1.5rem">play_circle</span>
+                </div>
+                {% endif %}
             </div>
         </div>
 
@@ -466,17 +585,41 @@
             <div class="divider"></div>
             
             <!-- SIZE -->
-            <div>
-                <div class="size-label">
-                    <span>Kích thước</span>
-                    <a href="#" style="font-size:0.8rem; color:var(--primary); text-decoration:none; font-weight:400">Bảng size →</a>
+            {% set product_sizes = (product.sizes | fromjson) if product.sizes else [] %}
+            {% if product_sizes %}
+            <div class="size-section">
+                <div class="size-header">
+                    <div class="size-header-left">
+                        <span class="size-title">Kích thước</span>
+                        <span class="size-selected-badge" id="sizeSelectedBadge"></span>
+                    </div>
+                    {% if product_sizes|length > 1 and product_sizes[0] != 'One Size' %}
+                    <a href="#" class="size-guide-link">
+                        <span class="material-symbols-outlined" style="font-size:0.9rem">straighten</span>
+                        Bảng size
+                    </a>
+                    {% endif %}
                 </div>
+
+                {% if product_sizes|length == 1 and product_sizes[0] == 'One Size' %}
+                <div>
+                    <div class="size-onesize">
+                        <span class="material-symbols-outlined" style="font-size:1rem">check_circle</span>
+                        One Size — Fits All
+                    </div>
+                    <p style="font-size:0.75rem;color:var(--text-muted);margin-top:0.5rem">Sản phẩm này chỉ có một kích cỡ duy nhất.</p>
+                </div>
+                {% else %}
                 <div class="size-grid">
-                    {% for size in ['XS', 'S', 'M', 'L', 'XL', 'XXL'] %}
-                    <button class="size-btn {% if size == 'M' %}active{% endif %}" onclick="selectSize(this)">{{ size }}</button>
+                    {% for size in product_sizes %}
+                    <button class="size-btn {% if loop.first %}active{% endif %}" onclick="selectSize(this)" data-size="{{ size }}">
+                        <span>{{ size }}</span>
+                    </button>
                     {% endfor %}
                 </div>
+                {% endif %}
             </div>
+            {% endif %}
             
             <!-- QUANTITY -->
             <div class="qty-section">
@@ -502,6 +645,7 @@
                 <form action="{{ url_for('add_to_cart', product_id=product.id) }}" method="POST" id="buy-now-form">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="quantity" id="buy-qty" value="1">
+                    <input type="hidden" name="next" value="{{ url_for('checkout') }}">
                     <button type="submit" class="btn btn-primary" style="width:100%">
                         Mua ngay
                     </button>
@@ -515,9 +659,10 @@
                         Thêm vào giỏ
                     </button>
                 </form>
-                <form action="{{ url_for('add_to_cart', product_id=product.id) }}" method="POST" id="buy-now-form" onsubmit="setTimeout(()=>window.location='{{ url_for('checkout') }}', 50)">
+                <form action="{{ url_for('add_to_cart', product_id=product.id) }}" method="POST" id="buy-now-form">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="quantity" id="buy-qty" value="1">
+                    <input type="hidden" name="next" value="{{ url_for('checkout') }}">
                     <button type="submit" class="btn btn-primary" style="width:100%">
                         Mua ngay
                     </button>
@@ -648,10 +793,68 @@
 
 {% block extra_scripts %}
 <script>
+let currentMediaIndex = 0;
+
+function changeMainMedia(type, url, element) {
+    const thumbs = Array.from(document.querySelectorAll('.thumb-item'));
+    currentMediaIndex = thumbs.indexOf(element);
+
+    document.querySelectorAll('.thumb-item').forEach(el => el.style.borderColor = 'transparent');
+    element.style.borderColor = 'var(--primary)';
+    
+    const mainImage = document.getElementById('mainImage');
+    const mainVideo = document.getElementById('mainVideo');
+    
+    if (type === 'image') {
+        if (mainVideo) {
+            mainVideo.style.display = 'none';
+            mainVideo.pause();
+        }
+        mainImage.src = url;
+        mainImage.style.display = 'block';
+    } else if (type === 'video') {
+        if (mainImage) mainImage.style.display = 'none';
+        if (mainVideo) {
+            mainVideo.style.display = 'block';
+            mainVideo.play();
+        }
+    }
+}
+
+function navigateMedia(dir) {
+    const thumbs = Array.from(document.querySelectorAll('.thumb-item'));
+    if (!thumbs.length) return;
+    
+    currentMediaIndex += dir;
+    if (currentMediaIndex < 0) currentMediaIndex = thumbs.length - 1;
+    if (currentMediaIndex >= thumbs.length) currentMediaIndex = 0;
+    
+    thumbs[currentMediaIndex].click();
+}
+
 function selectSize(btn) {
     document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
+    // Update the selected size badge
+    const badge = document.getElementById('sizeSelectedBadge');
+    if (badge) {
+        const sizeName = btn.dataset.size || btn.textContent.trim();
+        badge.textContent = sizeName;
+        badge.classList.add('show');
+    }
 }
+
+// Init size badge on page load
+(function() {
+    const activeBtn = document.querySelector('.size-btn.active');
+    if (activeBtn) {
+        const badge = document.getElementById('sizeSelectedBadge');
+        if (badge) {
+            badge.textContent = activeBtn.dataset.size || activeBtn.textContent.trim();
+            badge.classList.add('show');
+        }
+    }
+})();
 
 function adjustQty(delta) {
     const input = document.getElementById('qty');

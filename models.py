@@ -26,13 +26,17 @@ class Product(db.Model):
     price = db.Column(db.Float, nullable=False)
     old_price = db.Column(db.Float, nullable=True)
     image_url = db.Column(db.String(500), nullable=True)
+    extra_images = db.Column(db.Text, nullable=True) # JSON list of URLs
+    video_url = db.Column(db.String(500), nullable=True)
     stock = db.Column(db.Integer, default=100)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=False)
+    subcategory = db.Column(db.String(100), nullable=True)
     
     is_new = db.Column(db.Boolean, default=False)
     is_on_sale = db.Column(db.Boolean, default=False)
+    sizes = db.Column(db.Text, nullable=True)  # JSON list of size strings, e.g. ["S","M","L","XL"] or ["One Size"]
     
     reviews = db.relationship('Review', backref='product', lazy=True)
     order_items = db.relationship('OrderItem', backref='product_ref', lazy=True)

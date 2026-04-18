@@ -37,7 +37,7 @@
             line-height: 1.6;
         }
         
-        .font-display { font-family: 'Playfair Display', serif; }
+        .font-display { font-family: inherit; }
         
         /* NAVBAR */
         .navbar {
@@ -79,21 +79,22 @@
         .navbar-nav {
             display: flex;
             align-items: center;
-            gap: 0.3rem;
+            gap: 0.2rem;
             list-style: none;
-            background: linear-gradient(180deg, #ffffff, #f7f8fa);
-            border: 1px solid var(--border);
+            background: #ffffff;
+            border: 2px solid var(--primary);
             border-radius: 999px;
-            padding: 0.28rem;
-            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+            padding: 0.35rem 0.5rem;
+            box-shadow: 0 4px 20px rgba(10,92,54,0.15);
         }
         
         .navbar-nav a {
-            display: block;
-            padding: 0.55rem 1.05rem;
-            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            padding: 0.65rem 1.15rem;
+            font-size: 0.9rem;
             font-weight: 700;
-            color: var(--text-muted);
+            color: var(--text);
             text-decoration: none;
             border-radius: 999px;
             transition: all 0.2s;
@@ -103,16 +104,72 @@
         .navbar-nav a:hover,
         .navbar-nav a.active {
             color: var(--primary);
-            background: rgba(10,92,54,0.12);
+            background: rgba(10,92,54,0.08);
         }
         
         .navbar-nav a.sale {
             color: var(--red);
-            font-weight: 700;
         }
         
         .navbar-nav a.sale:hover {
             background: rgba(220,38,38,0.08);
+        }
+        
+        .nav-item-dropdown {
+            position: relative;
+            display: flex;
+        }
+        
+        .nav-item-dropdown::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            height: 12px;
+            background: transparent;
+            z-index: 10;
+        }
+        
+        .nav-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: white;
+            min-width: 180px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(10px);
+            transition: all 0.2s;
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            padding: 0.5rem 0;
+            margin-top: 6px;
+        }
+        
+        .nav-item-dropdown:hover .nav-dropdown {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateY(0);
+        }
+        
+        .nav-dropdown a {
+            padding: 0.6rem 1.25rem;
+            background: none;
+            border-radius: 0;
+            color: var(--text-muted);
+            font-weight: 500;
+            font-size: 0.85rem;
+        }
+        
+        .nav-dropdown a:hover {
+            color: var(--primary);
+            background: rgba(10,92,54,0.05);
+            padding-left: 1.5rem;
         }
         
         .navbar-search {
@@ -123,7 +180,7 @@
         
         .navbar-search input {
             width: 100%;
-            padding: 0.5rem 1rem 0.5rem 2.5rem;
+            padding: 0.5rem 2.8rem 0.5rem 2.5rem;
             border: 1.5px solid var(--border);
             border-radius: 50px;
             font-size: 0.875rem;
@@ -169,6 +226,53 @@
         .navbar-search button:hover {
             background: rgba(10,92,54,0.08);
             color: var(--primary);
+        }
+        
+        .search-dropdown {
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            z-index: 2000;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(-10px);
+            transition: all 0.2s;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .search-dropdown.open {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateY(0);
+        }
+        .search-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 15px;
+            text-decoration: none;
+            color: var(--text);
+            border-bottom: 1px solid var(--border);
+            transition: background 0.2s;
+        }
+        .search-item:last-child { border-bottom: none; }
+        .search-item:hover { background: var(--surface2); }
+        .search-item img {
+            width: 40px; height: 40px; border-radius: 6px; object-fit: cover; flex-shrink: 0;
+        }
+        .search-item div {
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+        .search-item strong {
+            font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .search-item span {
+            font-size: 0.8rem; color: var(--primary); font-weight: 600;
         }
         
         .navbar-actions {
@@ -384,7 +488,7 @@
         }
         
         .footer-brand h3 {
-            font-family: 'Playfair Display', serif;
+            font-family: inherit;
             font-size: 1.5rem;
             font-weight: 700;
             color: white;
@@ -531,20 +635,55 @@
         </a>
         
         <ul class="navbar-nav">
-            <li><a href="{{ url_for('products', category='Áo') }}" {% if request.args.get('category') == 'Áo' %}class="active"{% endif %}>Áo</a></li>
-            <li><a href="{{ url_for('products', category='Quần') }}" {% if request.args.get('category') == 'Quần' %}class="active"{% endif %}>Quần</a></li>
-            <li><a href="{{ url_for('products', category='Váy') }}" {% if request.args.get('category') == 'Váy' %}class="active"{% endif %}>Váy</a></li>
-            <li><a href="{{ url_for('products', category='Phụ kiện') }}" {% if request.args.get('category') == 'Phụ kiện' %}class="active"{% endif %}>Phụ kiện</a></li>
-            <li><a href="{{ url_for('products', sale='true') }}" class="sale{% if request.args.get('sale') %} active{% endif %}">Sale</a></li>
-            <li><a href="{{ url_for('order_lookup') }}">Tra cứu đơn</a></li>
+            <li class="nav-item-dropdown">
+                <a href="{{ url_for('products', category='Áo') }}" {% if request.args.get('category') == 'Áo' %}class="active"{% endif %}>Áo <span class="material-symbols-outlined" style="font-size:1.1rem;margin-left:4px">expand_more</span></a>
+                <div class="nav-dropdown">
+                    <a href="{{ url_for('products', category='Áo') }}">Xem tất cả Áo</a>
+                    <a href="{{ url_for('products', category='Áo', sub='Nam') }}">Áo Nam</a>
+                    <a href="{{ url_for('products', category='Áo', sub='Nữ') }}">Áo Nữ</a>
+                    <a href="{{ url_for('products', category='Áo', sub='Thun') }}">Áo Thun</a>
+                    <a href="{{ url_for('products', category='Áo', sub='Sơ mi') }}">Áo Sơ mi</a>
+                    <a href="{{ url_for('products', category='Áo', sub='Khoác') }}">Áo Khoác</a>
+                </div>
+            </li>
+            <li class="nav-item-dropdown">
+                <a href="{{ url_for('products', category='Quần') }}" {% if request.args.get('category') == 'Quần' %}class="active"{% endif %}>Quần <span class="material-symbols-outlined" style="font-size:1.1rem;margin-left:4px">expand_more</span></a>
+                <div class="nav-dropdown">
+                    <a href="{{ url_for('products', category='Quần') }}">Xem tất cả Quần</a>
+                    <a href="{{ url_for('products', category='Quần', sub='Nam') }}">Quần Nam</a>
+                    <a href="{{ url_for('products', category='Quần', sub='Nữ') }}">Quần Nữ</a>
+                    <a href="{{ url_for('products', category='Quần', sub='Dài') }}">Quần Dài / Jeans</a>
+                    <a href="{{ url_for('products', category='Quần', sub='Short') }}">Quần Short / Lửng</a>
+                </div>
+            </li>
+            <li class="nav-item-dropdown">
+                <a href="{{ url_for('products', category='Váy') }}" {% if request.args.get('category') == 'Váy' %}class="active"{% endif %}>Váy <span class="material-symbols-outlined" style="font-size:1.1rem;margin-left:4px">expand_more</span></a>
+                <div class="nav-dropdown">
+                    <a href="{{ url_for('products', category='Váy') }}">Xem tất cả Váy</a>
+                    <a href="{{ url_for('products', category='Váy', sub='Đầm') }}">Đầm</a>
+                    <a href="{{ url_for('products', category='Váy', sub='Chân váy') }}">Chân váy</a>
+                    <a href="{{ url_for('products', category='Váy', sub='Midi') }}">Váy Midi / Maxi</a>
+                </div>
+            </li>
+            <li class="nav-item-dropdown">
+                <a href="{{ url_for('products', category='Phụ kiện') }}" {% if request.args.get('category') == 'Phụ kiện' %}class="active"{% endif %}>Phụ kiện <span class="material-symbols-outlined" style="font-size:1.1rem;margin-left:4px">expand_more</span></a>
+                <div class="nav-dropdown">
+                    <a href="{{ url_for('products', category='Phụ kiện') }}">Xem tất cả</a>
+                    <a href="{{ url_for('products', category='Phụ kiện', sub='Nón') }}">Mũ / Nón</a>
+                    <a href="{{ url_for('products', category='Phụ kiện', sub='Túi') }}">Túi xách / Balo</a>
+                    <a href="{{ url_for('products', category='Phụ kiện', sub='Trang sức') }}">Trang sức</a>
+                </div>
+            </li>
+            <li><a href="{{ url_for('products', sale='true') }}" class="sale{% if request.args.get('sale') %} active{% endif %}">🔥 Sale</a></li>
         </ul>
         
         <form action="{{ url_for('products') }}" method="GET" class="navbar-search" role="search" aria-label="Tìm kiếm sản phẩm">
             <span class="material-symbols-outlined navbar-search-icon">search</span>
-            <input type="text" name="q" placeholder="Tìm kiếm sản phẩm..." value="{{ request.args.get('q', '') }}">
+            <input type="text" name="q" placeholder="Tìm kiếm sản phẩm..." value="{{ request.args.get('q', '') }}" autocomplete="off">
             <button type="submit" title="Tìm kiếm" aria-label="Tìm kiếm">
                 <span class="material-symbols-outlined" style="font-size:1.15rem">arrow_forward</span>
             </button>
+            <div class="search-dropdown" id="desktop-search-dropdown"></div>
         </form>
         
         <div class="navbar-actions">
@@ -574,19 +713,30 @@
                         <div class="user-dropdown-head">
                             <strong>{{ current_user.username }}</strong>
                             <span>{{ current_user.email }}</span>
+                            {% if current_user.role == 'admin' %}
+                            <span style="display:inline-block;margin-top:4px;background:#fef3c7;color:#92400e;font-size:0.7rem;font-weight:700;padding:2px 8px;border-radius:999px">ADMIN</span>
+                            {% endif %}
                         </div>
+                        {% if current_user.role != 'admin' %}
+                        <a href="{{ url_for('order_lookup') }}">
+                            <span class="material-symbols-outlined">local_shipping</span>
+                            Tra cứu đơn hàng
+                        </a>
                         <a href="{{ url_for('my_orders') }}">
                             <span class="material-symbols-outlined">receipt_long</span>
                             Đơn hàng của tôi
                         </a>
+                        {% endif %}
                         <a href="{{ url_for('profile') }}">
                             <span class="material-symbols-outlined">manage_accounts</span>
                             Thông tin tài khoản
                         </a>
+                        {% if current_user.role != 'admin' %}
                         <a href="{{ url_for('wishlist') }}">
                             <span class="material-symbols-outlined">favorite</span>
                             Danh sách yêu thích
                         </a>
+                        {% endif %}
                         {% if current_user.role == 'admin' %}
                         <hr class="user-dropdown-divider">
                         <a href="{{ url_for('admin_dashboard') }}">
@@ -602,8 +752,12 @@
                     </div>
                 </div>
             {% else %}
-                <a href="{{ url_for('login') }}" class="navbar-user-btn">
-                    <span class="material-symbols-outlined" style="font-size:1rem">person</span>
+                <a href="{{ url_for('order_lookup') }}" class="navbar-user-btn" style="background:#f8fafc">
+                    <span class="material-symbols-outlined" style="font-size:1rem;color:var(--primary)">local_shipping</span>
+                    Tra cứu đơn
+                </a>
+                <a href="{{ url_for('login') }}" class="navbar-user-btn" style="background:var(--primary);color:#fff;border:none">
+                    <span class="material-symbols-outlined" style="font-size:1rem;color:#fff">person</span>
                     Đăng nhập
                 </a>
             {% endif %}
@@ -613,22 +767,26 @@
 <div class="mobile-nav" id="mobile-nav">
     <form action="{{ url_for('products') }}" method="GET" class="navbar-search" role="search" aria-label="Tìm kiếm sản phẩm mobile">
         <span class="material-symbols-outlined navbar-search-icon">search</span>
-        <input type="text" name="q" placeholder="Tìm kiếm sản phẩm..." value="{{ request.args.get('q', '') }}">
+        <input type="text" name="q" placeholder="Tìm kiếm sản phẩm..." value="{{ request.args.get('q', '') }}" autocomplete="off">
         <button type="submit" title="Tìm kiếm">
             <span class="material-symbols-outlined" style="font-size:1.15rem">arrow_forward</span>
         </button>
+        <div class="search-dropdown" id="mobile-search-dropdown"></div>
     </form>
     <div class="mobile-nav-links">
-        <a href="{{ url_for('products', category='Áo') }}">Áo</a>
-        <a href="{{ url_for('products', category='Quần') }}">Quần</a>
-        <a href="{{ url_for('products', category='Váy') }}">Váy</a>
+        <a href="{{ url_for('products', category='Áo') }}">Áo (Nam/Nữ)</a>
+        <a href="{{ url_for('products', category='Quần') }}">Quần (Jeans/Short)</a>
+        <a href="{{ url_for('products', category='Váy') }}">Váy đầm</a>
         <a href="{{ url_for('products', category='Phụ kiện') }}">Phụ kiện</a>
-        <a href="{{ url_for('products', sale='true') }}">Sale</a>
-        <a href="{{ url_for('order_lookup') }}">Tra cứu đơn</a>
+        <a href="{{ url_for('products', sale='true') }}" style="color:var(--red)">🔥 Sale</a>
         {% if current_user.is_authenticated %}
+        <a href="{{ url_for('order_lookup') }}">Tra cứu đơn</a>
         <a href="{{ url_for('wishlist') }}">Yêu thích</a>
-        <a href="{{ url_for('my_orders') }}">Đơn hàng</a>
-        <a href="{{ url_for('profile') }}">Tài khoản</a>
+        <a href="{{ url_for('my_orders') }}">Đơn hàng cá nhân</a>
+        <a href="{{ url_for('profile') }}">Hồ sơ</a>
+        {% else %}
+        <a href="{{ url_for('order_lookup') }}">Tra cứu đơn</a>
+        <a href="{{ url_for('login') }}">Đăng nhập</a>
         {% endif %}
     </div>
 </div>
@@ -656,43 +814,77 @@
             <h3>{{ shop.name }}</h3>
             <p>{{ shop.description }}</p>
             <div class="footer-social">
-                <a href="#" title="Facebook">f</a>
-                <a href="#" title="Instagram">ig</a>
-                <a href="#" title="TikTok">tk</a>
+                <a href="#" title="Facebook" style="font-family:sans-serif;font-size:0.75rem;font-weight:700">FB</a>
+                <a href="#" title="Instagram" style="font-family:sans-serif;font-size:0.75rem;font-weight:700">IG</a>
+                <a href="#" title="TikTok" style="font-family:sans-serif;font-size:0.75rem;font-weight:700">TK</a>
             </div>
         </div>
+
+        <!-- Cột 1: Danh mục sản phẩm -->
         <div class="footer-col">
-            <h4>Sản phẩm</h4>
+            <h4>Danh mục</h4>
             <ul>
-                <li><a href="{{ url_for('products', category='Áo') }}">Áo</a></li>
-                <li><a href="{{ url_for('products', category='Quần') }}">Quần</a></li>
-                <li><a href="{{ url_for('products', category='Váy') }}">Váy</a></li>
+                <li><a href="{{ url_for('products', category='Áo') }}">Áo Nam / Nữ</a></li>
+                <li><a href="{{ url_for('products', category='Áo', sub='Sơ mi') }}">Áo Sơ mi</a></li>
+                <li><a href="{{ url_for('products', category='Áo', sub='Khoác') }}">Áo Khoác / Blazer</a></li>
+                <li><a href="{{ url_for('products', category='Quần') }}">Quần Jeans / Tây</a></li>
+                <li><a href="{{ url_for('products', category='Váy') }}">Váy / Đầm</a></li>
                 <li><a href="{{ url_for('products', category='Phụ kiện') }}">Phụ kiện</a></li>
-                <li><a href="{{ url_for('products', sale='true') }}">Sale</a></li>
+                <li><a href="{{ url_for('products', sale='true') }}" style="color:#dc2626">🔥 Sale</a></li>
             </ul>
         </div>
+
+        <!-- Cột 2: Hỗ trợ khách hàng -->
         <div class="footer-col">
             <h4>Hỗ trợ</h4>
             <ul>
-                <li><a href="{{ url_for('contact') }}">Liên hệ</a></li>
-                <li><a href="{{ url_for('policy') }}">Chính sách đổi trả</a></li>
-                <li><a href="{{ url_for('policy') }}">Bảo hành</a></li>
-                <li><a href="{{ url_for('policy') }}">Vận chuyển</a></li>
+                <li><a href="{{ url_for('contact') }}">Liên hệ chúng tôi</a></li>
+                <li><a href="{{ url_for('order_lookup') }}">Tra cứu đơn hàng</a></li>
+                {% if current_user.is_authenticated %}
+                <li><a href="{{ url_for('my_orders') }}">Đơn hàng của tôi</a></li>
+                {% endif %}
+                <li><a href="{{ url_for('policy') }}">Chính sách</a></li>
             </ul>
         </div>
-        <div class="footer-col">
+
+        <!-- Cột 3: Địa chỉ + Google Maps -->
+        <div class="footer-col footer-col-contact">
             <h4>Liên hệ</h4>
             <ul>
-                <li><span class="material-symbols-outlined" style="font-size:1.1rem">location_on</span> {{ shop.address }}</li>
-                <li><span class="material-symbols-outlined" style="font-size:1.1rem">phone</span> {{ shop.phone_display }}</li>
-                <li><span class="material-symbols-outlined" style="font-size:1.1rem">email</span> {{ shop.email }}</li>
+                <li style="display:flex;align-items:flex-start;gap:6px">
+                    <span class="material-symbols-outlined" style="font-size:1.1rem;margin-top:2px;flex-shrink:0">location_on</span>
+                    <span>{{ shop.address }}</span>
+                </li>
+                <li style="display:flex;align-items:center;gap:6px">
+                    <span class="material-symbols-outlined" style="font-size:1.1rem">phone</span>
+                    <a href="tel:{{ shop.phone_display }}" style="color:inherit">{{ shop.phone_display }}</a>
+                </li>
+                <li style="display:flex;align-items:center;gap:6px">
+                    <span class="material-symbols-outlined" style="font-size:1.1rem">email</span>
+                    <a href="mailto:{{ shop.email }}" style="color:inherit">{{ shop.email }}</a>
+                </li>
             </ul>
+            <!-- Google Maps: 02 Võ Oanh, P.25, Bình Thạnh, HCM -->
+            <div style="margin-top:1rem;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,0.1)">
+                <iframe
+                    src="https://maps.google.com/maps?q=02+V%C3%B5+Oanh%2C+Ph%C6%B0%E1%BB%9Dng+25%2C+B%C3%ACnh+Th%E1%BA%A1nh%2C+H%E1%BB%93+Ch%C3%AD+Minh%2C+Vi%E1%BB%87t+Nam&t=&z=16&ie=UTF8&iwloc=&output=embed"
+                    width="100%"
+                    height="160"
+                    style="border:0;display:block"
+                    allowfullscreen=""
+                    loading="lazy"
+                    referrerpolicy="no-referrer-when-downgrade"
+                    title="Bản đồ UTH Store - 02 Võ Oanh, P.25, Bình Thạnh">
+                </iframe>
+            </div>
+
         </div>
     </div>
     <div class="footer-bottom">
         <p>© 2026 {{ shop.name }}. Tất cả quyền được bảo lưu.</p>
     </div>
 </footer>
+
 
 <script>
 // Auto-dismiss flash messages
@@ -727,6 +919,70 @@ if (dropBtn && dropdown) {
     });
     dropdown.addEventListener('click', (e) => e.stopPropagation());
 }
+
+// Live Search API logic
+document.querySelectorAll('.navbar-search input[name="q"]').forEach(input => {
+    let debounceTimer;
+    const form = input.closest('form');
+    const dropdown = form.querySelector('.search-dropdown');
+    
+    input.addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        const q = this.value.trim();
+        
+        if (q.length < 1) {
+            dropdown.classList.remove('open');
+            return;
+        }
+        
+        debounceTimer = setTimeout(() => {
+            fetch(`/api/search?q=${encodeURIComponent(q)}`)
+                .then(res => res.json())
+                .then(data => {
+                    dropdown.innerHTML = '';
+                    if (data.length > 0) {
+                        data.forEach(item => {
+                            dropdown.innerHTML += `
+                                <a href="${item.url}" class="search-item">
+                                    <img src="${item.image_url}" alt="">
+                                    <div>
+                                        <strong>${item.name}</strong>
+                                        <span>${item.price}</span>
+                                    </div>
+                                </a>
+                            `;
+                        });
+                    } else {
+                        dropdown.innerHTML = `<div style="padding:15px;text-align:center;color:#666;font-size:0.85rem">Không tìm thấy "${q}"</div>`;
+                    }
+                    dropdown.classList.add('open');
+                })
+                .catch(err => console.error(err));
+        }, 300);
+    });
+    
+    // Hide dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!form.contains(e.target)) {
+            dropdown.classList.remove('open');
+        }
+    });
+    
+    // Show on focus if it has value
+    input.addEventListener('focus', function() {
+        if (this.value.trim().length > 0 && dropdown.innerHTML.trim() !== '') {
+            dropdown.classList.add('open');
+        }
+    });
+
+    // Make sure hitting enter goes to products search page
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            form.submit();
+        }
+    });
+});
 </script>
 {% block extra_scripts %}{% endblock %}
 </body>

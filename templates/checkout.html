@@ -8,7 +8,7 @@
   display:grid;grid-template-columns:1fr 360px;gap:2rem;align-items:start;
 }
 .card{background:#fff;border-radius:16px;padding:1.5rem;box-shadow:0 2px 8px rgba(0,0,0,0.06);}
-.title{font-family:'Playfair Display',serif;font-size:1.9rem;font-weight:800;margin-bottom:0.25rem;}
+.title{font-family:inherit;font-size:1.9rem;font-weight:800;margin-bottom:0.25rem;}
 .sub{color:var(--text-muted);font-size:0.9rem;margin-bottom:1.25rem;}
 .field{margin-bottom:1rem;}
 .label{display:block;font-size:0.8rem;font-weight:700;margin-bottom:0.4rem;}
@@ -106,8 +106,24 @@
         </div>
       </div>
 
-      <button type="submit" class="btn-pay">Tạo đơn hàng</button>
+      <button type="submit" class="btn-pay" id="btn-submit-order">Tạo đơn hàng</button>
     </form>
+    <script>
+      document.querySelector('form').addEventListener('submit', function(e) {
+        var btn = document.getElementById('btn-submit-order');
+        if (btn.classList.contains('processing')) {
+          e.preventDefault();
+          return;
+        }
+        btn.classList.add('processing');
+        btn.innerHTML = 'Đang xử lý... <span class="material-symbols-outlined" style="font-size:1rem; animation:spin 1s linear infinite">hourglass_empty</span>';
+        btn.style.opacity = '0.7';
+        btn.style.cursor = 'not-allowed';
+      });
+    </script>
+    <style>
+      @keyframes spin { 100% { transform:rotate(360deg); } }
+    </style>
   </div>
 
   <div class="card summary">

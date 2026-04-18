@@ -6,7 +6,7 @@
 .page{max-width:1100px;margin:0 auto;padding:2.5rem 2rem;}
 .grid{display:grid;grid-template-columns:1fr 360px;gap:2rem;align-items:start;}
 .card{background:#fff;border-radius:16px;padding:1.5rem;box-shadow:0 2px 8px rgba(0,0,0,0.06);}
-.h{font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:900;margin-bottom:0.25rem;}
+.h{font-family:inherit;font-size:1.8rem;font-weight:900;margin-bottom:0.25rem;}
 .muted{color:var(--text-muted);}
 .row{display:flex;justify-content:space-between;gap:1rem;margin:0.5rem 0;}
 .tag{display:inline-block;padding:0.25rem 0.6rem;border-radius:999px;font-size:0.72rem;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;}
@@ -80,7 +80,10 @@ pre{white-space:pre-wrap;background:var(--surface2);border-radius:12px;padding:1
         <a class="btn outline" style="margin-top:1rem;width:100%" href="{{ url_for('products') }}">Tiếp tục mua sắm</a>
       {% elif order.payment_method == 'BANK_TRANSFER' %}
         <div style="margin-top:1rem" class="muted">Vui lòng chuyển khoản theo thông tin dưới đây. Nội dung chuyển khoản nên ghi <strong>UTH{{ order.id }}</strong>.</div>
-        <pre style="margin-top:0.75rem">{{ bank_info.replace('{{order_id}}', order.id|string) }}</pre>
+        <div style="margin-top:1.5rem; margin-bottom:1rem; display: flex; justify-content: center;">
+          <img src="https://img.vietqr.io/image/MB-01237890-compact2.png?amount={{ order.total_amount|int }}&addInfo=UTH{{ order.id }}&accountName=DO%20HUU%20HUAN" alt="QR Code Thanh Toán" style="max-width: 280px; border-radius: 12px; border: 2px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.05); padding: 0.5rem; background: #fff;">
+        </div>
+        <pre style="margin-top:0.75rem; font-size: 0.95rem; line-height: 1.6;">{{ bank_info.replace('{{order_id}}', order.id|string) }}</pre>
         <a class="btn outline" style="margin-top:1rem;width:100%" href="{{ url_for('products') }}">Tiếp tục mua sắm</a>
       {% elif order.payment_method == 'MOMO' %}
         <div style="margin-top:1rem" class="muted">Bấm nút bên dưới để thanh toán qua MoMo.</div>
