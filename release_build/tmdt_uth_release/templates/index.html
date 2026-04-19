@@ -1,0 +1,1037 @@
+{% extends 'base.html' %}
+{% block title %}{{ shop.name }} — Thời Trang Cao Cấp{% endblock %}
+{% block meta_description %}{{ shop.name }} — Bộ sưu tập thời trang cao cấp, phong cách, cá tính. Mua sắm ngay hôm nay.{% endblock %}
+
+{% block extra_styles %}
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ========== HERO SLIDER ========== */
+.hero {
+    position: relative;
+    height: 95vh;
+    min-height: 640px;
+    overflow: hidden;
+}
+
+.hero-slide {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 1.2s ease;
+}
+.hero-slide.active { opacity: 1; }
+
+.hero-slide-bg {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    transform: scale(1.08);
+    transition: transform 7s ease;
+}
+.hero-slide.active .hero-slide-bg {
+    transform: scale(1);
+}
+
+.hero-slide-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(110deg, rgba(5,30,15,0.82) 35%, rgba(0,0,0,0.2) 100%);
+}
+
+.hero-content {
+    position: relative;
+    z-index: 5;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 3rem;
+    color: white;
+}
+
+.hero-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+.hero-label::before {
+    content: '';
+    display: inline-block;
+    width: 36px;
+    height: 1px;
+    background: var(--gold);
+}
+
+.hero h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(4rem, 9vw, 8.5rem);
+    font-weight: 700;
+    line-height: 0.95;
+    letter-spacing: -0.02em;
+    margin-bottom: 0;
+    max-width: 750px;
+}
+.hero h1 em {
+    font-style: italic;
+    color: var(--gold);
+    font-weight: 600;
+}
+
+/* Hero text panels */
+.hero-text {
+    display: none;
+}
+.hero-text.active {
+    display: block;
+    animation: heroTextIn 0.6s ease forwards;
+}
+@keyframes heroTextIn {
+    from { opacity: 0; transform: translateY(22px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.hero-sub {
+    font-size: 1.05rem;
+    color: rgba(255,255,255,0.75);
+    max-width: 500px;
+    line-height: 1.85;
+    margin: 1.5rem 0 2.5rem;
+    font-weight: 300;
+    letter-spacing: 0.01em;
+}
+
+.hero-actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.btn-hero-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: var(--gold);
+    color: #1a1a1a;
+    padding: 0.9rem 2.25rem;
+    border-radius: 3px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-decoration: none;
+    transition: all 0.25s;
+}
+.btn-hero-primary:hover {
+    background: var(--gold-light);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(201,168,76,0.4);
+}
+
+.btn-hero-ghost {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: transparent;
+    color: white;
+    padding: 0.9rem 2.25rem;
+    border-radius: 3px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-decoration: none;
+    border: 1.5px solid rgba(255,255,255,0.45);
+    transition: all 0.25s;
+}
+.btn-hero-ghost:hover {
+    background: rgba(255,255,255,0.1);
+    border-color: white;
+}
+
+/* Slider controls */
+.hero-dots {
+    position: absolute;
+    bottom: 2.5rem;
+    left: 3rem;
+    z-index: 10;
+    display: flex;
+    gap: 0.5rem;
+}
+.hero-dot {
+    width: 28px;
+    height: 2px;
+    background: rgba(255,255,255,0.35);
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s;
+    padding: 0;
+}
+.hero-dot.active {
+    background: var(--gold);
+    width: 48px;
+}
+
+.hero-stats {
+    position: absolute;
+    bottom: 2.5rem;
+    right: 3rem;
+    z-index: 10;
+    display: flex;
+    gap: 2.5rem;
+    color: white;
+}
+.hero-stat-num {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 2rem;
+    font-weight: 600;
+    color: var(--gold);
+    line-height: 1;
+    display: block;
+}
+.hero-stat-lbl {
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: rgba(255,255,255,0.5);
+    margin-top: 4px;
+    display: block;
+}
+
+/* ========== MARQUEE ========== */
+.marquee-bar {
+    background: #111;
+    color: rgba(255,255,255,0.75);
+    padding: 0.875rem 0;
+    overflow: hidden;
+    white-space: nowrap;
+}
+.marquee-inner {
+    display: inline-flex;
+    gap: 2.5rem;
+    animation: marquee 28s linear infinite;
+}
+.marquee-inner span {
+    font-size: 0.72rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+}
+.marquee-inner .sep { color: var(--gold); font-size: 1rem; }
+@keyframes marquee {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+}
+
+/* ========== SECTION BASE ========== */
+.section { padding: 6rem 0; }
+.section-inner {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+.section-eyebrow {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--primary);
+    margin-bottom: 0.75rem;
+}
+.section-headline {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(2rem, 4vw, 3.25rem);
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.1;
+}
+.section-headline em { font-style: italic; color: var(--primary); }
+
+/* ========== CATEGORY IMAGE STRIP ========== */
+.cat-strip {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    grid-template-rows: auto auto;
+    gap: 8px;
+    height: 600px;
+}
+
+.cat-strip-item {
+    position: relative;
+    overflow: hidden;
+    text-decoration: none;
+    color: white;
+    border-radius: 4px;
+}
+.cat-strip-item:first-child {
+    grid-row: 1 / 3; /* tall on left */
+}
+
+.cat-strip-img {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    transition: transform 0.7s ease;
+}
+.cat-strip-item:hover .cat-strip-img { transform: scale(1.06); }
+
+.cat-strip-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 55%);
+    transition: background 0.3s;
+}
+.cat-strip-item:hover .cat-strip-overlay {
+    background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.1) 60%);
+}
+
+.cat-strip-label {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 2rem 1.5rem;
+}
+.cat-strip-label h3 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.75rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+.cat-strip-label span {
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.65);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.cat-strip-item:hover .cat-strip-label span { color: var(--gold); }
+
+/* ========== IMAGE REEL (horizontal scroll) ========== */
+.reel-wrapper {
+    overflow: hidden;
+    position: relative;
+}
+.reel-track {
+    display: flex;
+    gap: 1rem;
+    animation: reel 40s linear infinite;
+    width: max-content;
+}
+.reel-track:hover { animation-play-state: paused; }
+
+@keyframes reel {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+}
+
+.reel-item {
+    width: 260px;
+    height: 340px;
+    border-radius: 6px;
+    overflow: hidden;
+    flex-shrink: 0;
+    position: relative;
+}
+.reel-item img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    transition: transform 0.5s;
+}
+.reel-item:hover img { transform: scale(1.05); }
+.reel-item-overlay {
+    position: absolute; inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 60%);
+    opacity: 0; transition: opacity 0.3s;
+}
+.reel-item:hover .reel-item-overlay { opacity: 1; }
+
+/* ========== PRODUCT GRID ========== */
+.products-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.25rem;
+}
+
+.pcard {
+    background: white;
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    transition: box-shadow 0.3s;
+}
+.pcard:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.12); }
+.pcard-link { display: block; color: inherit; text-decoration: none; }
+.pcard-img {
+    position: relative;
+    aspect-ratio: 3/4;
+    overflow: hidden;
+    background: #f5f5f5;
+}
+.pcard-img img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    transition: transform 0.7s ease;
+}
+.pcard:hover .pcard-img img { transform: scale(1.07); }
+
+.pcard-badge {
+    position: absolute;
+    top: 0.75rem; left: 0.75rem;
+    padding: 0.25rem 0.6rem;
+    font-size: 0.62rem; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    border-radius: 2px;
+}
+.badge-new { background: var(--primary); color: white; }
+.badge-sale { background: #d00; color: white; }
+
+.pcard-overlay {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    transform: translateY(100%);
+    transition: transform 0.3s;
+    padding: 0.75rem;
+    display: flex; gap: 0.5rem;
+    background: rgba(0,0,0,0.5);
+}
+.pcard:hover .pcard-overlay { transform: translateY(0); }
+
+.pcard-btn {
+    flex: 1; padding: 0.55rem 0;
+    border: none; border-radius: 2px;
+    font-size: 0.72rem; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    cursor: pointer; font-family: inherit;
+    text-align: center; text-decoration: none;
+    transition: all 0.2s;
+}
+.pcard-btn-white { background: white; color: var(--primary); }
+.pcard-btn-white:hover { background: var(--primary); color: white; }
+.pcard-btn-primary { background: var(--primary); color: white; }
+.pcard-btn-primary:hover { background: var(--primary-dark); }
+
+.pcard-info { padding: 1rem; }
+.pcard-cat {
+    font-size: 0.62rem; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 0.25rem;
+}
+.pcard-name {
+    font-size: 0.9rem; font-weight: 600; color: var(--text);
+    margin-bottom: 0.4rem;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.pcard-price { display: flex; align-items: center; gap: 0.5rem; }
+.price-now { font-weight: 700; color: var(--primary); font-size: 0.98rem; }
+.price-was { font-size: 0.8rem; color: #999; text-decoration: line-through; }
+
+/* ========== SALE BANNER ========== */
+.sale-ribbon {
+    position: relative;
+    overflow: hidden;
+    background: #0f0f0f;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    min-height: 480px;
+}
+.sale-ribbon-text {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 4rem 4rem 4rem 4rem;
+    color: white;
+    position: relative;
+    z-index: 2;
+}
+.sale-ribbon-text .eyebrow {
+    font-size: 0.68rem; letter-spacing: 0.3em;
+    text-transform: uppercase; color: #dc2626;
+    margin-bottom: 1rem;
+}
+.sale-ribbon-text h2 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(3rem, 5vw, 5.5rem);
+    font-weight: 600; line-height: 1;
+    margin-bottom: 1rem;
+}
+.sale-ribbon-text h2 em { font-style: italic; color: var(--gold); }
+.sale-ribbon-text p { color: rgba(255,255,255,0.6); margin-bottom: 2rem; font-size: 0.95rem; }
+
+.sale-ribbon-img {
+    position: relative;
+    overflow: hidden;
+}
+.sale-ribbon-img img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    filter: brightness(0.85);
+    transition: transform 0.7s ease, filter 0.3s;
+}
+.sale-ribbon:hover .sale-ribbon-img img {
+    transform: scale(1.03); filter: brightness(0.95);
+}
+.sale-ribbon-price {
+    position: absolute; top: 2rem; right: 2rem;
+    background: #dc2626; color: white;
+    width: 90px; height: 90px;
+    border-radius: 50%;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    font-weight: 900; box-shadow: 0 4px 20px rgba(220,38,38,0.4);
+}
+.sale-ribbon-price .pct { font-size: 2rem; line-height: 1; }
+.sale-ribbon-price .off { font-size: 0.65rem; letter-spacing: 0.1em; }
+
+/* ========== BESTSELLERS ========== */
+.bs-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.25rem;
+}
+.bs-card {
+    position: relative;
+    border-radius: 4px;
+    overflow: hidden;
+    text-decoration: none;
+    color: var(--text);
+    background: white;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    transition: all 0.3s;
+}
+.bs-card:hover { transform: translateY(-5px); box-shadow: 0 12px 36px rgba(0,0,0,0.12); }
+.bs-rank {
+    position: absolute; top: 0.875rem; right: 0.875rem;
+    width: 36px; height: 36px;
+    background: var(--gold); color: #111;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.75rem; font-weight: 900;
+    z-index: 2; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+.bs-img { aspect-ratio: 4/5; overflow: hidden; }
+.bs-img img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s; }
+.bs-card:hover .bs-img img { transform: scale(1.06); }
+.bs-info { padding: 1rem; text-align: center; }
+.bs-info h4 { font-size: 0.88rem; font-weight: 600; margin-bottom: 0.3rem; }
+.bs-info p { font-weight: 700; color: var(--primary); font-size: 0.95rem; }
+
+/* ========== FEATURES ========== */
+.features-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    text-align: center;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+}
+.feature-item {
+    padding: 2.5rem 2rem;
+    border-right: 1px solid var(--border);
+    transition: background 0.2s;
+}
+.feature-item:last-child { border-right: none; }
+.feature-item:hover { background: rgba(10,92,54,0.03); }
+.feature-icon {
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    background: rgba(10,92,54,0.08);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 1rem;
+    color: var(--primary);
+    transition: all 0.3s;
+}
+.feature-item:hover .feature-icon {
+    background: var(--primary); color: white;
+    transform: scale(1.1);
+}
+.feature-item h4 { font-size: 0.88rem; font-weight: 700; margin-bottom: 0.3rem; }
+.feature-item p { font-size: 0.8rem; color: var(--text-muted); }
+
+/* ========== SECTION CTA STRIP ========== */
+.fashion-strip {
+    background: var(--primary);
+    padding: 1.25rem 0;
+    overflow: hidden;
+}
+.fashion-strip-inner {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    gap: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+.fashion-strip-item {
+    display: flex; align-items: center; gap: 0.75rem;
+    color: white;
+    font-size: 0.8rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.1em;
+}
+.fashion-strip-item span { color: var(--gold); }
+
+/* ========== EMPTY STATE ========== */
+.empty-state { text-align: center; padding: 4rem 2rem; color: var(--text-muted); }
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 1024px) {
+    .cat-strip { grid-template-columns: 1fr 1fr; height: auto; }
+    .cat-strip-item:first-child { grid-row: auto; }
+    .products-grid { grid-template-columns: repeat(2, 1fr); }
+    .bs-grid { grid-template-columns: repeat(2, 1fr); }
+    .hero-stats { display: none; }
+    .features-strip { grid-template-columns: repeat(2, 1fr); }
+    .feature-item:nth-child(2) { border-right: none; }
+    .feature-item:nth-child(3) { border-right: 1px solid var(--border); }
+    .sale-ribbon { grid-template-columns: 1fr; }
+    .sale-ribbon-img { height: 300px; }
+}
+@media (max-width: 640px) {
+    .section { padding: 4rem 0; }
+    .section-inner { padding: 0 1rem; }
+    .hero { height: 76vh; min-height: 560px; }
+    .hero-content { padding: 0 1.5rem; }
+    .hero-label { letter-spacing: 0.22em; margin-bottom: 1rem; }
+    .hero-sub { font-size: 0.95rem; line-height: 1.7; margin: 1.2rem 0 2rem; }
+    .hero-actions { width: 100%; }
+    .btn-hero-primary,
+    .btn-hero-ghost { width: 100%; justify-content: center; }
+    .hero-dots { left: 1.5rem; }
+    .cat-strip { grid-template-columns: 1fr; height: auto; }
+    .cat-strip-item { height: 250px; }
+    .features-strip { grid-template-columns: 1fr 1fr; }
+    .products-grid,
+    .bs-grid { grid-template-columns: 1fr 1fr; gap: 0.85rem; }
+    .pcard-info,
+    .bs-info { padding: 0.85rem; }
+    .sale-ribbon-text { padding: 3rem 1.5rem; }
+    .fashion-strip-inner { flex-direction: column; gap: 1rem; }
+}
+@media (max-width: 420px) {
+    .hero-content { padding: 0 1rem; }
+    .hero h1 { font-size: clamp(2.65rem, 12vw, 3.7rem); }
+    .hero-dots { left: 1rem; bottom: 1.5rem; }
+    .products-grid,
+    .bs-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .features-strip { grid-template-columns: 1fr; }
+    .cat-strip-item { height: 220px; }
+    .section-headline { font-size: 1.8rem; }
+    .pcard-info,
+    .bs-info { padding: 0.75rem; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ========== HERO SLIDER ========== -->
+<section class="hero" id="hero">
+    <!-- Background Slides ONLY -->
+    <div class="hero-slide active" id="slide-0">
+        <div class="hero-slide-bg" style="background-image:url('https://images.unsplash.com/photo-1558769132-cb1aea458c5e?w=1800&q=80')"></div>
+        <div class="hero-slide-overlay"></div>
+    </div>
+    <div class="hero-slide" id="slide-1">
+        <div class="hero-slide-bg" style="background-image:url('https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1800&q=80')"></div>
+        <div class="hero-slide-overlay"></div>
+    </div>
+    <div class="hero-slide" id="slide-2">
+        <div class="hero-slide-bg" style="background-image:url('https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=1800&q=80')"></div>
+        <div class="hero-slide-overlay"></div>
+    </div>
+
+    <!-- Hero TEXT content — always on top, separate from bg slides -->
+    <div class="hero-content" id="hero-content">
+
+        <!-- Text slide 0 -->
+        <div class="hero-text active" id="htext-0">
+            <div class="hero-label">Bộ Sưu Tập Xuân Hè 2026</div>
+            <h1>UTH Store: <em>Khẳng định</em><br>chất riêng</h1>
+            <p class="hero-sub">Cập nhật những item mới nhất từ {{ shop.name }}<br>sẵn sàng tỏa sáng mỗi ngày đến trường.</p>
+            <div class="hero-actions">
+                <a href="{{ url_for('products') }}" class="btn-hero-primary">
+                    Khám phá ngay
+                    <span class="material-symbols-outlined" style="font-size:1rem">arrow_forward</span>
+                </a>
+                <a href="{{ url_for('products', sale='true') }}" class="btn-hero-ghost">Xem khuyến mãi</a>
+            </div>
+        </div>
+
+        <!-- Text slide 1 -->
+        <div class="hero-text" id="htext-1">
+            <div class="hero-label">Phong Cách — Style — Fashion</div>
+            <h1>Mặc đẹp,<br><em>tự tin hơn</em></h1>
+            <p class="hero-sub">Bộ sưu tập thời trang trẻ trung, năng động<br>dành riêng cho sinh viên UTH.</p>
+            <div class="hero-actions">
+                <a href="{{ url_for('products', category='Áo') }}" class="btn-hero-primary">
+                    Xem Áo mới
+                    <span class="material-symbols-outlined" style="font-size:1rem">arrow_forward</span>
+                </a>
+                <a href="{{ url_for('products', category='Quần') }}" class="btn-hero-ghost">Khám phá Quần</a>
+            </div>
+        </div>
+
+        <!-- Text slide 2 -->
+        <div class="hero-text" id="htext-2">
+            <div class="hero-label">Chất Liệu Cao Cấp — Giá Tốt</div>
+            <h1>Xu hướng mới,<br><em>giá sinh viên</em></h1>
+            <p class="hero-sub">Thời trang chất lượng, phải chăng<br>sẵn sàng cho mọi bước chân của bạn.</p>
+            <div class="hero-actions">
+                <a href="{{ url_for('products', sale='true') }}" class="btn-hero-primary">
+                    Xem màn sale
+                    <span class="material-symbols-outlined" style="font-size:1rem">local_offer</span>
+                </a>
+                <a href="{{ url_for('products') }}" class="btn-hero-ghost">Toàn bộ sản phẩm</a>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="hero-dots" id="hero-dots">
+        <button class="hero-dot active" onclick="goSlide(0)"></button>
+        <button class="hero-dot" onclick="goSlide(1)"></button>
+        <button class="hero-dot" onclick="goSlide(2)"></button>
+    </div>
+
+    <div class="hero-stats">
+        <div>
+            <span class="hero-stat-num">500+</span>
+            <span class="hero-stat-lbl">Sản phẩm</span>
+        </div>
+        <div>
+            <span class="hero-stat-num">10k+</span>
+            <span class="hero-stat-lbl">Khách hàng</span>
+        </div>
+        <div>
+            <span class="hero-stat-num">4.9★</span>
+            <span class="hero-stat-lbl">Đánh giá</span>
+        </div>
+    </div>
+</section>
+
+<!-- ========== MARQUEE ========== -->
+<div class="marquee-bar">
+    <div class="marquee-inner">
+        <span>Miễn phí vận chuyển đơn từ 500k</span>
+        <span class="sep">✦</span>
+        <span>Đổi size miễn phí trong 30 ngày</span>
+        <span class="sep">✦</span>
+        <span>Thanh toán an toàn 100%</span>
+        <span class="sep">✦</span>
+        <span>Chất liệu cao cấp được tuyển chọn</span>
+        <span class="sep">✦</span>
+        <span>Phong cách thời trang học đường</span>
+        <span class="sep">✦</span>
+        <span>Miễn phí vận chuyển đơn từ 500k</span>
+        <span class="sep">✦</span>
+        <span>Đổi size miễn phí trong 30 ngày</span>
+        <span class="sep">✦</span>
+        <span>Thanh toán an toàn 100%</span>
+        <span class="sep">✦</span>
+        <span>Chất liệu cao cấp được tuyển chọn</span>
+        <span class="sep">✦</span>
+        <span>Phong cách thời trang học đường</span>
+        <span class="sep">✦</span>
+    </div>
+</div>
+
+<!-- ========== CATEGORIES VISUAL STRIP ========== -->
+<section class="section" style="padding:5rem 0">
+    <div class="section-inner">
+        <div class="reveal" style="display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;margin-bottom:2.5rem">
+            <div>
+                <p class="section-eyebrow">Danh mục</p>
+                <h2 class="section-headline">Khám phá <em>phong cách</em></h2>
+            </div>
+            <a href="{{ url_for('products') }}" style="font-size:0.78rem;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--primary);text-decoration:none;display:flex;align-items:center;gap:6px;white-space:nowrap">
+                Tất cả
+                <span class="material-symbols-outlined" style="font-size:1rem">arrow_forward</span>
+            </a>
+        </div>
+
+        <div class="cat-strip">
+            <a href="{{ url_for('products', category='Áo') }}" class="cat-strip-item">
+                <div class="cat-strip-img" style="background-image:url('https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=900&q=80')"></div>
+                <div class="cat-strip-overlay"></div>
+                <div class="cat-strip-label">
+                    <h3>Áo</h3>
+                    <span>
+                        Áo nam / Áo nữ / Áo khoác
+                        <span class="material-symbols-outlined" style="font-size:0.9rem">arrow_forward</span>
+                    </span>
+                </div>
+            </a>
+            <a href="{{ url_for('products', category='Quần') }}" class="cat-strip-item">
+                <div class="cat-strip-img" style="background-image:url('https://images.unsplash.com/photo-1542272604-787c3835535d?w=700&q=80')"></div>
+                <div class="cat-strip-overlay"></div>
+                <div class="cat-strip-label">
+                    <h3>Quần</h3>
+                    <span>Jeans / Lửng / Short <span class="material-symbols-outlined" style="font-size:0.9rem">arrow_forward</span></span>
+                </div>
+            </a>
+            <a href="{{ url_for('products', category='Váy') }}" class="cat-strip-item">
+                <div class="cat-strip-img" style="background-image:url('https://images.unsplash.com/photo-1585487000160-6ebcfceb0d03?w=700&q=80')"></div>
+                <div class="cat-strip-overlay"></div>
+                <div class="cat-strip-label">
+                    <h3>Váy</h3>
+                    <span>Đầm / Midi / Chân váy <span class="material-symbols-outlined" style="font-size:0.9rem">arrow_forward</span></span>
+                </div>
+            </a>
+            <a href="{{ url_for('products', category='Phụ kiện') }}" class="cat-strip-item">
+                <div class="cat-strip-img" style="background-image:url('https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=700&q=80')"></div>
+                <div class="cat-strip-overlay"></div>
+                <div class="cat-strip-label">
+                    <h3>Phụ kiện</h3>
+                    <span>Túi / Mũ / Trang sức <span class="material-symbols-outlined" style="font-size:0.9rem">arrow_forward</span></span>
+                </div>
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- ========== AUTO-REEL (infinite scroll images) ========== -->
+<div style="background:#f5f3f0;padding:3rem 0;overflow:hidden">
+    <div class="reel-wrapper">
+        <div class="reel-track">
+            <!-- Set 1 — dùng URLs đã verify từ seed.py -->
+            <div class="reel-item"><img src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=500&h=660&fit=crop&auto=format&q=80" alt="Fashion"><div class="reel-item-overlay"></div></div>
+            <div class="reel-item"><img src="https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=500&h=660&fit=crop&auto=format&q=80" alt="Fashion"><div class="reel-item-overlay"></div></div>
+            <div class="reel-item"><img src="https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=500&h=660&fit=crop&auto=format&q=80" alt="Fashion"><div class="reel-item-overlay"></div></div>
+            <div class="reel-item"><img src="https://images.unsplash.com/photo-1572804013427-4d7ca7268217?w=500&h=660&fit=crop&auto=format&q=80" alt="Fashion"><div class="reel-item-overlay"></div></div>
+            <div class="reel-item"><img src="https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=500&h=660&fit=crop&auto=format&q=80" alt="Fashion"><div class="reel-item-overlay"></div></div>
+            <div class="reel-item"><img src="https://images.unsplash.com/photo-1509631179647-0177331693ae?w=500&h=660&fit=crop&auto=format&q=80" alt="Fashion"><div class="reel-item-overlay"></div></div>
+            <div class="reel-item"><img src="https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=500&h=660&fit=crop&auto=format&q=80" alt="Fashion"><div class="reel-item-overlay"></div></div>
+            <div class="reel-item"><img src="https://images.unsplash.com/photo-1551537482-f2075a1d41f2?w=500&h=660&fit=crop&auto=format&q=80" alt="Fashion"><div class="reel-item-overlay"></div></div>
+            <div class="reel-item"><img src="https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=500&h=660&fit=crop&auto=format&q=80" alt="Fashion"><div class="reel-item-overlay"></div></div>
+            <div class="reel-item"><img src="https://images.unsplash.com/photo-1539109136881-3be0616acf4b?w=500&h=660&fit=crop&auto=format&q=80" alt="Fashion"><div class="reel-item-overlay"></div></div>
+            <!-- Set 2 — mirror để loop liền mạch -->
+            <div class="reel-item"><img src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=500&h=660&fit=crop&auto=format&q=80" alt="Fashion"><div class="reel-item-overlay"></div></div>
+            <div class="reel-item"><img src="https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=500&h=660&fit=crop&auto=format&q=80" alt="Fashion"><div class="reel-item-overlay"></div></div>
+            <div class="reel-item"><img src="https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=500&h=660&fit=crop&auto=format&q=80" alt="Fashion"><div class="reel-item-overlay"></div></div>
+            <div class="reel-item"><img src="https://images.unsplash.com/photo-1572804013427-4d7ca7268217?w=500&h=660&fit=crop&auto=format&q=80" alt="Fashion"><div class="reel-item-overlay"></div></div>
+            <div class="reel-item"><img src="https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=500&h=660&fit=crop&auto=format&q=80" alt="Fashion"><div class="reel-item-overlay"></div></div>
+            <div class="reel-item"><img src="https://images.unsplash.com/photo-1509631179647-0177331693ae?w=500&h=660&fit=crop&auto=format&q=80" alt="Fashion"><div class="reel-item-overlay"></div></div>
+            <div class="reel-item"><img src="https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=500&h=660&fit=crop&auto=format&q=80" alt="Fashion"><div class="reel-item-overlay"></div></div>
+            <div class="reel-item"><img src="https://images.unsplash.com/photo-1551537482-f2075a1d41f2?w=500&h=660&fit=crop&auto=format&q=80" alt="Fashion"><div class="reel-item-overlay"></div></div>
+            <div class="reel-item"><img src="https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=500&h=660&fit=crop&auto=format&q=80" alt="Fashion"><div class="reel-item-overlay"></div></div>
+            <div class="reel-item"><img src="https://images.unsplash.com/photo-1539109136881-3be0616acf4b?w=500&h=660&fit=crop&auto=format&q=80" alt="Fashion"><div class="reel-item-overlay"></div></div>
+        </div>
+    </div>
+</div>
+
+<!-- ========== NEW ARRIVALS ========== -->
+
+<section class="section">
+    <div class="section-inner">
+        <div class="reveal" style="display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;margin-bottom:2.5rem">
+            <div>
+                <p class="section-eyebrow">Mới nhất</p>
+                <h2 class="section-headline">Hàng <em>mới về</em></h2>
+            </div>
+            <a href="{{ url_for('products') }}" style="font-size:0.78rem;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--primary);text-decoration:none;display:flex;align-items:center;gap:6px;white-space:nowrap">
+                Xem tất cả
+                <span class="material-symbols-outlined" style="font-size:1rem">arrow_forward</span>
+            </a>
+        </div>
+
+        {% if new_products %}
+        <div class="products-grid" id="new-arrivals-grid">
+            {% for product in new_products %}
+            <div class="pcard reveal">
+                <a class="pcard-link" href="{{ url_for('product_detail', product_id=product.id) }}">
+                    <div class="pcard-img">
+                        <img src="{{ product.image_url }}" alt="{{ product.name }}" loading="lazy">
+                        {% if product.is_new %}<span class="pcard-badge badge-new">New</span>
+                        {% elif product.is_on_sale %}<span class="pcard-badge badge-sale">Sale</span>{% endif %}
+                        <div class="pcard-overlay">
+                            <span class="pcard-btn pcard-btn-primary" style="display:flex;align-items:center;justify-content:center;gap:4px">
+                                <span class="material-symbols-outlined" style="font-size:0.9rem">visibility</span> Xem
+                            </span>
+                        </div>
+                    </div>
+                    <div class="pcard-info">
+                        <p class="pcard-cat">{{ product.category.name if product.category else 'UTH Store' }}</p>
+                        <h3 class="pcard-name">{{ product.name }}</h3>
+                        <div class="pcard-price">
+                            <span class="price-now">{{ "{:,.0f}".format(product.price) }}đ</span>
+                            {% if product.old_price %}<span class="price-was">{{ "{:,.0f}".format(product.old_price) }}đ</span>{% endif %}
+                        </div>
+                    </div>
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div><span class="material-symbols-outlined" style="font-size:3.5rem;color:#ccc">inventory_2</span></div>
+            <p>Chưa có sản phẩm mới.</p>
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+<!-- ========== FASHION STRIP ========== -->
+<div class="fashion-strip">
+    <div class="fashion-strip-inner">
+        <div class="fashion-strip-item">
+            <span class="material-symbols-outlined" style="font-size:1.3rem">local_shipping</span>
+            Freeship <span>từ 500K</span>
+        </div>
+        <div class="fashion-strip-item">
+            <span class="material-symbols-outlined" style="font-size:1.3rem">autorenew</span>
+            Đổi trả <span>30 ngày</span>
+        </div>
+        <div class="fashion-strip-item">
+            <span class="material-symbols-outlined" style="font-size:1.3rem">shield</span>
+            Chính hãng <span>100%</span>
+        </div>
+        <div class="fashion-strip-item">
+            <span class="material-symbols-outlined" style="font-size:1.3rem">star</span>
+            Đánh giá <span>4.9 ★</span>
+        </div>
+    </div>
+</div>
+
+<!-- ========== SALE RIBBON ========== -->
+<div class="sale-ribbon reveal">
+    <div class="sale-ribbon-text">
+        <p class="eyebrow">✦ Flash Sale — Có hạn</p>
+        <h2>Sale lên tới<br><em>50% off</em></h2>
+        <p>Bộ sưu tập mùa cũ — Cơ hội vàng không thể bỏ lỡ. Số lượng có hạn.</p>
+        <a href="{{ url_for('products', sale='true') }}" class="btn-hero-primary" style="width:fit-content">
+            Mua ngay
+            <span class="material-symbols-outlined" style="font-size:1rem">arrow_forward</span>
+        </a>
+    </div>
+    <div class="sale-ribbon-img">
+        <img src="https://images.unsplash.com/photo-1483985988355-763728e1935b?w=900&q=80" alt="Sale">
+        <div class="sale-ribbon-price">
+            <span class="pct">50%</span>
+            <span class="off">OFF</span>
+        </div>
+    </div>
+</div>
+
+<!-- ========== BESTSELLERS ========== -->
+<section class="section" style="background:#f9f7f4">
+    <div class="section-inner">
+        <div class="reveal" style="display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;margin-bottom:2.5rem">
+            <div>
+                <p class="section-eyebrow">Most Loved</p>
+                <h2 class="section-headline">Bán <em>chạy nhất</em></h2>
+            </div>
+            <a href="{{ url_for('products') }}" style="font-size:0.78rem;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--primary);text-decoration:none;display:flex;align-items:center;gap:6px;white-space:nowrap">
+                Xem tất cả
+                <span class="material-symbols-outlined" style="font-size:1rem">arrow_forward</span>
+            </a>
+        </div>
+
+        {% if sale_products %}
+        <div class="bs-grid">
+            {% for product in sale_products %}
+            <a href="{{ url_for('product_detail', product_id=product.id) }}" class="bs-card reveal">
+                <div class="bs-rank">#{{ loop.index }}</div>
+                <div class="bs-img">
+                    <img src="{{ product.image_url }}" alt="{{ product.name }}" loading="lazy">
+                </div>
+                <div class="bs-info">
+                    <h4>{{ product.name }}</h4>
+                    <p>{{ "{:,.0f}".format(product.price) }}đ</p>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>Chưa có dữ liệu sản phẩm.</p>
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+<!-- ========== FEATURES ========== -->
+<section style="background:white">
+    <div class="section-inner" style="padding:0">
+        <div class="features-strip reveal">
+            <div class="feature-item">
+                <div class="feature-icon">
+                    <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24">local_shipping</span>
+                </div>
+                <h4>Miễn phí giao hàng</h4>
+                <p>Đơn hàng từ 500.000đ</p>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">
+                    <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24">autorenew</span>
+                </div>
+                <h4>Đổi trả dễ dàng</h4>
+                <p>Trong vòng 30 ngày</p>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">
+                    <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24">shield</span>
+                </div>
+                <h4>Bảo hành chính hãng</h4>
+                <p>Cam kết 100% chất lượng</p>
+            </div>
+            <div class="feature-item">
+                <div class="feature-icon">
+                    <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24">diamond</span>
+                </div>
+                <h4>Chất lượng cao cấp</h4>
+                <p>Tuyển chọn kỹ từng sản phẩm</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// ========== Hero Slider ==========
+let currentSlide = 0;
+const totalSlides = 3;
+let slideTimer;
+
+function goSlide(idx) {
+    // Switch background slides
+    document.querySelectorAll('.hero-slide').forEach(s => s.classList.remove('active'));
+    document.getElementById('slide-' + idx).classList.add('active');
+
+    // Switch text panels via active class
+    document.querySelectorAll('.hero-text').forEach(t => t.classList.remove('active'));
+    document.getElementById('htext-' + idx).classList.add('active');
+
+    // Dots
+    document.querySelectorAll('.hero-dot').forEach(d => d.classList.remove('active'));
+    document.querySelectorAll('.hero-dot')[idx].classList.add('active');
+
+    currentSlide = idx;
+}
+
+// Make first text panel visible immediately on load
+document.getElementById('htext-0').classList.add('active');
+
+function nextSlide() {
+    goSlide((currentSlide + 1) % totalSlides);
+}
+
+slideTimer = setInterval(nextSlide, 6000);
+document.getElementById('hero').addEventListener('mouseenter', () => clearInterval(slideTimer));
+document.getElementById('hero').addEventListener('mouseleave', () => {
+    slideTimer = setInterval(nextSlide, 6000);
+});
+</script>
+{% endblock %}

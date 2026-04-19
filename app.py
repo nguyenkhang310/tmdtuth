@@ -3,11 +3,13 @@ import os
 from dotenv import load_dotenv
 load_dotenv(override=True)
 import sqlite3
+import smtplib
 import uuid
 import json
 import hmac
 import hashlib
 import urllib.parse
+from email.message import EmailMessage
 from urllib.parse import urlparse, urljoin
 import unicodedata
 import re
@@ -81,6 +83,27 @@ app.config['SHOP_INFO'] = {
     ).strip(),
 }
 
+# Mail config (SMTP with console fallback for local demo)
+app.config['MAIL_SERVER'] = (os.environ.get('MAIL_SERVER') or '').strip()
+app.config['MAIL_PORT'] = int((os.environ.get('MAIL_PORT') or '587').strip() or '587')
+app.config['MAIL_USE_TLS'] = (os.environ.get('MAIL_USE_TLS') or '1').strip().lower() in ['1', 'true', 'yes', 'on']
+app.config['MAIL_USE_SSL'] = (os.environ.get('MAIL_USE_SSL') or '0').strip().lower() in ['1', 'true', 'yes', 'on']
+app.config['MAIL_USERNAME'] = (os.environ.get('MAIL_USERNAME') or '').strip()
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD') or ''
+app.config['MAIL_DEFAULT_SENDER'] = (
+    os.environ.get('MAIL_DEFAULT_SENDER')
+    or os.environ.get('MAIL_USERNAME')
+    or ''
+).strip()
+app.config['MAIL_CONSOLE_FALLBACK'] = (
+    os.environ.get('MAIL_CONSOLE_FALLBACK')
+    or ('1' if (_is_debug_mode or _is_testing_mode) else '0')
+).strip().lower() in ['1', 'true', 'yes', 'on']
+app.config['PASSWORD_RESET_EXPIRES_MINUTES'] = max(
+    5,
+    int((os.environ.get('PASSWORD_RESET_EXPIRES_MINUTES') or '30').strip() or '30')
+)
+
 # Payment config (prefer env vars in production)
 app.config['BANK_TRANSFER_INFO'] = os.environ.get('BANK_TRANSFER_INFO') or (
     "Ngân hàng: MB Bank\n"
@@ -108,6 +131,13 @@ app.config['COUPONS'] = {
     "FREESHIP": {"type": "shipping", "value": 30000, "min_subtotal": 300000},
     "SAVE50K": {"type": "fixed", "value": 50000, "min_subtotal": 600000},
 }
+app.config['ORDER_CANCEL_REASONS'] = [
+    "Tôi muốn thay đổi địa chỉ nhận hàng",
+    "Tôi muốn đổi sản phẩm hoặc phân loại",
+    "Tôi đặt nhầm đơn hàng",
+    "Tôi tìm thấy giá tốt hơn",
+    "Thời gian giao hàng dự kiến quá lâu",
+]
 
 # Custom Jinja2 filters
 @app.template_filter('enumerate')
@@ -116,12 +146,17 @@ def jinja_enumerate(iterable, start=0):
 
 @app.template_filter('fromjson')
 def jinja_fromjson(value):
+    return _safe_json_list(value)
+
+
+def _safe_json_list(value):
     if not value:
         return []
     try:
-        return json.loads(value)
+        parsed = json.loads(value)
     except Exception:
         return []
+    return parsed if isinstance(parsed, list) else []
 
 
 # Upload config
@@ -181,6 +216,10 @@ def ensure_order_schema():
         cursor.execute("ALTER TABLE 'order' ADD COLUMN shipping_address VARCHAR(500)")
     if 'note' not in cols:
         cursor.execute("ALTER TABLE 'order' ADD COLUMN note VARCHAR(500)")
+    if 'cancel_reason' not in cols:
+        cursor.execute("ALTER TABLE 'order' ADD COLUMN cancel_reason VARCHAR(500)")
+    if 'cancelled_at' not in cols:
+        cursor.execute("ALTER TABLE 'order' ADD COLUMN cancelled_at DATETIME")
     if 'payment_method' not in cols:
         cursor.execute("ALTER TABLE 'order' ADD COLUMN payment_method VARCHAR(50) DEFAULT 'COD'")
         cursor.execute("UPDATE 'order' SET payment_method='COD' WHERE payment_method IS NULL")
@@ -195,7 +234,7 @@ def ensure_order_schema():
 
 
 def ensure_user_schema():
-    """Thêm cột reset_token vào bảng user nếu chưa có (dùng schema migration đơn giản)."""
+    """Thêm các cột hồ sơ người dùng nếu chưa có (schema migration đơn giản)."""
     db_path = os.path.join(app.instance_path, 'ecommerce.db')
     if not os.path.exists(db_path):
         return
@@ -205,6 +244,18 @@ def ensure_user_schema():
     cursor.execute("PRAGMA table_info(user);")
     cols = {row[1] for row in cursor.fetchall()}
 
+    if 'first_name' not in cols:
+        cursor.execute("ALTER TABLE user ADD COLUMN first_name VARCHAR(100)")
+    if 'last_name' not in cols:
+        cursor.execute("ALTER TABLE user ADD COLUMN last_name VARCHAR(100)")
+    if 'phone' not in cols:
+        cursor.execute("ALTER TABLE user ADD COLUMN phone VARCHAR(30)")
+    if 'address' not in cols:
+        cursor.execute("ALTER TABLE user ADD COLUMN address VARCHAR(500)")
+    if 'birth_date' not in cols:
+        cursor.execute("ALTER TABLE user ADD COLUMN birth_date DATE")
+    if 'policy_accepted_at' not in cols:
+        cursor.execute("ALTER TABLE user ADD COLUMN policy_accepted_at DATETIME")
     if 'reset_token' not in cols:
         cursor.execute("ALTER TABLE user ADD COLUMN reset_token VARCHAR(100)")
     if 'reset_token_expires' not in cols:
@@ -212,6 +263,119 @@ def ensure_user_schema():
 
     conn.commit()
     conn.close()
+
+
+def _normalize_phone(phone: str) -> str:
+    return re.sub(r'\s+', '', (phone or '').strip())
+
+
+def _parse_birth_date(value: str):
+    value = (value or '').strip()
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, '%Y-%m-%d').date()
+    except ValueError:
+        return None
+
+
+def _split_shipping_name(full_name: str) -> tuple[str, str]:
+    full_name = (full_name or '').strip()
+    if not full_name:
+        return '', ''
+    parts = full_name.split()
+    if len(parts) == 1:
+        return '', parts[0]
+    return ' '.join(parts[:-1]), parts[-1]
+
+
+def _extract_momo_order_id(order_id_raw: str = '', extra_data_raw: str = '') -> Optional[int]:
+    extra_data = urllib.parse.unquote(extra_data_raw or '').strip()
+    if extra_data:
+        try:
+            parsed = json.loads(extra_data)
+            order_id = int(parsed.get('order_id'))
+            if order_id > 0:
+                return order_id
+        except Exception:
+            pass
+
+    match = re.search(r'UTH(\d+)', order_id_raw or '')
+    if match:
+        return int(match.group(1))
+    return None
+
+
+def _build_vnpay_txn_ref(order_id: int) -> str:
+    return f"UTHVNP{order_id}-{uuid.uuid4().hex[:10]}"
+
+
+def _extract_vnpay_order_id(txn_ref: str = '') -> Optional[int]:
+    match = re.search(r'UTHVNP(\d+)', txn_ref or '')
+    if match:
+        return int(match.group(1))
+    if str(txn_ref).isdigit():
+        return int(txn_ref)
+    return None
+
+
+def _resolve_cancel_reason_from_form() -> tuple[Optional[str], Optional[str]]:
+    choice = (request.form.get('cancel_reason_choice') or '').strip()
+    note = (request.form.get('cancel_reason_note') or '').strip()
+    allowed = app.config.get('ORDER_CANCEL_REASONS', [])
+
+    if choice == '__other__':
+        if len(note) < 5:
+            return None, 'Vui lòng nhập lý do cụ thể cho lựa chọn "Khác".'
+        return note, None
+
+    if choice not in allowed:
+        return None, 'Vui lòng chọn một lý do hủy đơn hàng.'
+
+    return choice, None
+
+
+def _build_checkout_profile(user: Optional[User]) -> dict[str, str]:
+    if not user or not getattr(user, 'is_authenticated', False):
+        return {
+            'shipping_name': '',
+            'shipping_phone': '',
+            'shipping_address': '',
+            'guest_email': '',
+        }
+
+    return {
+        'shipping_name': user.full_name or user.username or '',
+        'shipping_phone': user.phone or '',
+        'shipping_address': user.address or '',
+        'guest_email': user.email or '',
+    }
+
+
+def _can_cancel_order(order: Order) -> bool:
+    return order.status not in ['shipped', 'delivered', 'cancelled']
+
+
+def _restore_order_stock(order: Order) -> None:
+    for item in order.items:
+        product = item.product or Product.query.get(item.product_id)
+        if not product or product.stock is None:
+            continue
+        product.stock = int(product.stock) + int(item.quantity or 0)
+
+
+def _cancel_order(order: Order, reason: str, actor: str = 'user') -> None:
+    if order.status == 'cancelled':
+        return
+
+    _restore_order_stock(order)
+    order.status = 'cancelled'
+    order.cancel_reason = (reason or '').strip()
+    order.cancelled_at = datetime.utcnow()
+    if order.payment_status != 'paid':
+        order.payment_status = 'cancelled'
+    if actor == 'admin' and not order.cancel_reason:
+        order.cancel_reason = 'Đơn hàng được hủy bởi quản trị viên.'
 
 
 def _hmac_sha256(secret: str, data: str) -> str:
@@ -237,6 +401,284 @@ def _missing_payment_env_vars() -> dict[str, list[str]]:
         if empty_keys:
             missing[provider] = empty_keys
     return missing
+
+
+def _mail_is_configured() -> bool:
+    sender = app.config.get('MAIL_DEFAULT_SENDER', '').strip() or app.config.get('SHOP_INFO', {}).get('support_email', '').strip()
+    server = app.config.get('MAIL_SERVER', '').strip()
+    if not sender or not server:
+        return False
+    username = app.config.get('MAIL_USERNAME', '').strip()
+    password = app.config.get('MAIL_PASSWORD', '')
+    if username and not password:
+        return False
+    return True
+
+
+def _send_email(subject: str, recipients: list[str], text_body: str) -> bool:
+    recipients = [email.strip() for email in recipients if email and email.strip()]
+    if not recipients:
+        return False
+
+    sender = app.config.get('MAIL_DEFAULT_SENDER', '').strip() or app.config.get('SHOP_INFO', {}).get('support_email', '').strip()
+
+    if not _mail_is_configured():
+        if app.config.get('MAIL_CONSOLE_FALLBACK'):
+            app.logger.warning(
+                "SMTP chưa cấu hình. Nội dung email được ghi ra log để demo.\nTo: %s\nSubject: %s\n\n%s",
+                ", ".join(recipients),
+                subject,
+                text_body,
+            )
+            return True
+        return False
+
+    message = EmailMessage()
+    message['Subject'] = subject
+    message['From'] = sender
+    message['To'] = ", ".join(recipients)
+    message.set_content(text_body)
+
+    host = app.config.get('MAIL_SERVER')
+    port = int(app.config.get('MAIL_PORT') or 587)
+    username = app.config.get('MAIL_USERNAME', '').strip()
+    password = app.config.get('MAIL_PASSWORD', '')
+    use_tls = bool(app.config.get('MAIL_USE_TLS'))
+    use_ssl = bool(app.config.get('MAIL_USE_SSL'))
+
+    try:
+        if use_ssl:
+            smtp_client = smtplib.SMTP_SSL(host, port, timeout=20)
+        else:
+            smtp_client = smtplib.SMTP(host, port, timeout=20)
+        with smtp_client as smtp:
+            smtp.ehlo()
+            if use_tls and not use_ssl:
+                smtp.starttls()
+                smtp.ehlo()
+            if username:
+                smtp.login(username, password)
+            smtp.send_message(message)
+        return True
+    except Exception:
+        app.logger.exception("Không gửi được email tới %s", ", ".join(recipients))
+        if app.config.get('MAIL_CONSOLE_FALLBACK'):
+            app.logger.warning(
+                "Chuyển sang console fallback cho email reset password.\nTo: %s\nSubject: %s\n\n%s",
+                ", ".join(recipients),
+                subject,
+                text_body,
+            )
+            return True
+        return False
+
+
+def _send_password_reset_email(user: User, reset_url: str) -> bool:
+    expires_minutes = int(app.config.get('PASSWORD_RESET_EXPIRES_MINUTES') or 30)
+    shop_name = app.config.get('SHOP_INFO', {}).get('name', 'UTH Store')
+    subject = f"[{shop_name}] Liên kết đặt lại mật khẩu"
+    greeting_name = user.display_name or user.email
+    text_body = (
+        f"Xin chào {greeting_name},\n\n"
+        "Chúng tôi đã nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn.\n"
+        f"Liên kết đặt lại mật khẩu: {reset_url}\n\n"
+        f"Liên kết này sẽ hết hạn sau {expires_minutes} phút và chỉ dùng được một lần.\n"
+        "Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.\n\n"
+        f"Trân trọng,\n{shop_name}"
+    )
+    return _send_email(subject, [user.email], text_body)
+
+
+def _payment_config_error(payment_method: str) -> Optional[str]:
+    payment_method = (payment_method or '').strip().upper()
+    if payment_method == 'MOMO':
+        missing = [key for key in ['MOMO_ENDPOINT', 'MOMO_PARTNER_CODE', 'MOMO_ACCESS_KEY', 'MOMO_SECRET_KEY']
+                   if not str(app.config.get(key, '')).strip()]
+        if missing:
+            return 'Chưa cấu hình MoMo merchant (MOMO_ENDPOINT/MOMO_PARTNER_CODE/MOMO_ACCESS_KEY/MOMO_SECRET_KEY).'
+    elif payment_method == 'VNPAY':
+        missing = [key for key in ['VNPAY_TMN_CODE', 'VNPAY_HASH_SECRET', 'VNPAY_URL']
+                   if not str(app.config.get(key, '')).strip()]
+        if missing:
+            return 'Chưa cấu hình VNPAY merchant (VNPAY_TMN_CODE/VNPAY_HASH_SECRET/VNPAY_URL).'
+    return None
+
+
+def _prepare_momo_payment(order: Order) -> str:
+    config_error = _payment_config_error('MOMO')
+    if config_error:
+        raise ValueError(config_error)
+
+    partner_code = app.config.get('MOMO_PARTNER_CODE', '')
+    access_key = app.config.get('MOMO_ACCESS_KEY', '')
+    secret_key = app.config.get('MOMO_SECRET_KEY', '')
+    endpoint = app.config.get('MOMO_ENDPOINT')
+
+    request_id = f"{order.id}-{uuid.uuid4().hex}"
+    momo_order_id = f"UTH{order.id}-{uuid.uuid4().hex[:10]}"
+    amount = int(round(order.total_amount))
+    order_info = f"Thanh toan don hang #{order.id}"
+    redirect_url = _absolute_url('momo_return')
+    ipn_url = _absolute_url('momo_ipn')
+    request_type = "captureWallet"
+    extra_data = urllib.parse.quote(
+        json.dumps({"order_id": order.id}, ensure_ascii=False, separators=(',', ':'))
+    )
+    amount_str = str(int(amount))
+
+    raw_signature = (
+        f"accessKey={access_key}"
+        f"&amount={amount_str}"
+        f"&extraData={extra_data}"
+        f"&ipnUrl={ipn_url}"
+        f"&orderId={momo_order_id}"
+        f"&orderInfo={order_info}"
+        f"&partnerCode={partner_code}"
+        f"&redirectUrl={redirect_url}"
+        f"&requestId={request_id}"
+        f"&requestType={request_type}"
+    )
+    signature = _hmac_sha256(secret_key, raw_signature)
+
+    payload = {
+        "partnerCode": partner_code,
+        "partnerName": app.config.get('SHOP_INFO', {}).get('name', 'UTH Store'),
+        "storeId": "UTHStore",
+        "requestId": request_id,
+        "amount": amount_str,
+        "orderId": momo_order_id,
+        "orderInfo": order_info,
+        "redirectUrl": redirect_url,
+        "ipnUrl": ipn_url,
+        "lang": "vi",
+        "extraData": extra_data,
+        "requestType": request_type,
+        "signature": signature,
+    }
+
+    tx = PaymentTransaction(
+        order_id=order.id,
+        provider='MOMO',
+        amount=float(amount),
+        status='initiated',
+        provider_ref=momo_order_id,
+        raw_request=json.dumps(payload, ensure_ascii=False),
+    )
+    db.session.add(tx)
+    order.payment_status = 'initiated'
+    order.payment_ref = momo_order_id
+
+    try:
+        resp = requests.post(endpoint, json=payload, timeout=20)
+        data = resp.json()
+    except Exception as exc:
+        order.payment_status = 'failed'
+        tx.status = 'failed'
+        raise ValueError('Không kết nối được MoMo. Vui lòng thử lại.') from exc
+
+    tx.raw_response = json.dumps(data, ensure_ascii=False)
+    pay_url = data.get('payUrl') or data.get('deeplink') or data.get('qrCodeUrl')
+    if not pay_url or int(data.get('resultCode', -1)) != 0:
+        order.payment_status = 'failed'
+        tx.status = 'failed'
+        raise ValueError('Tạo thanh toán MoMo thất bại. Vui lòng thử lại.')
+
+    return pay_url
+
+
+def _prepare_vnpay_payment(order: Order) -> str:
+    config_error = _payment_config_error('VNPAY')
+    if config_error:
+        raise ValueError(config_error)
+
+    tmn_code = app.config.get('VNPAY_TMN_CODE', '')
+    hash_secret = app.config.get('VNPAY_HASH_SECRET', '')
+    vnp_url = app.config.get('VNPAY_URL', '')
+    txn_ref = _build_vnpay_txn_ref(order.id)
+    amount = int(round(order.total_amount)) * 100
+    create_date = (datetime.utcnow() + timedelta(hours=7)).strftime("%Y%m%d%H%M%S")
+    expire_date = (datetime.utcnow() + timedelta(hours=7, minutes=15)).strftime("%Y%m%d%H%M%S")
+
+    vnp_params = {
+        "vnp_Version": "2.1.0",
+        "vnp_Command": "pay",
+        "vnp_TmnCode": tmn_code,
+        "vnp_Amount": str(amount),
+        "vnp_CurrCode": "VND",
+        "vnp_TxnRef": txn_ref,
+        "vnp_OrderInfo": f"Thanh toan don hang #{order.id}",
+        "vnp_OrderType": "other",
+        "vnp_Locale": "vn",
+        "vnp_ReturnUrl": _absolute_url('vnpay_return'),
+        "vnp_IpAddr": request.headers.get('X-Forwarded-For', request.remote_addr) or "127.0.0.1",
+        "vnp_CreateDate": create_date,
+        "vnp_ExpireDate": expire_date,
+    }
+    sorted_items = sorted(vnp_params.items())
+    hashdata = "&".join([f"{k}={urllib.parse.quote_plus(str(v))}" for k, v in sorted_items])
+    secure_hash = _vnpay_hmac_sha512(hash_secret, hashdata)
+    query = urllib.parse.urlencode(sorted_items, quote_via=urllib.parse.quote_plus)
+    pay_url = f"{vnp_url}?{query}&vnp_SecureHash={secure_hash}"
+
+    tx = PaymentTransaction(
+        order_id=order.id,
+        provider='VNPAY',
+        amount=float(int(round(order.total_amount))),
+        status='initiated',
+        provider_ref=txn_ref,
+        raw_request=json.dumps(vnp_params, ensure_ascii=False),
+    )
+    db.session.add(tx)
+    order.payment_status = 'initiated'
+    order.payment_ref = txn_ref
+    return pay_url
+
+
+def _create_order_from_items(
+    *,
+    user_id: int,
+    items,
+    shipping_name: str,
+    shipping_phone: str,
+    shipping_address: str,
+    note: str,
+    payment_method: str,
+    totals: dict,
+    db_coupon: Optional[Coupon],
+) -> tuple[Order, list]:
+    materialized_items = list(items)
+    order = Order(
+        user_id=user_id,
+        total_amount=float(totals['grand_total']),
+        status='pending',
+        shipping_name=shipping_name,
+        shipping_phone=shipping_phone,
+        shipping_address=shipping_address,
+        note=note,
+        payment_method=payment_method,
+        payment_status='initiated' if payment_method in ['MOMO', 'VNPAY'] else 'unpaid'
+    )
+    db.session.add(order)
+    db.session.flush()
+
+    for item in materialized_items:
+        product, quantity = _extract_cart_line(item)
+        if not product or quantity < 1:
+            continue
+        product_id = int(item.product_id) if hasattr(item, 'product_id') else int(product.id)
+        db.session.add(OrderItem(
+            order_id=order.id,
+            product_id=product_id,
+            quantity=quantity,
+            price=product.price,
+        ))
+        if product.stock is not None:
+            product.stock = max(0, int(product.stock) - int(quantity))
+
+    if db_coupon and totals.get("applied_coupon"):
+        db_coupon.used_count = int(db_coupon.used_count or 0) + 1
+
+    return order, materialized_items
 
 
 def _is_safe_redirect_url(target: str) -> bool:
@@ -299,6 +741,12 @@ limiter = Limiter(
     default_limits=["500 per day", "200 per hour"],
     storage_uri=_limiter_storage_uri,
 )
+
+with app.app_context():
+    db.create_all()
+    ensure_db_schema()
+    ensure_order_schema()
+    ensure_user_schema()
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -447,6 +895,7 @@ def inject_user_counters():
     return {
         "wishlist_count": wishlist_count,
         "shop": app.config.get('SHOP_INFO', {}),
+        "order_cancel_reasons": app.config.get('ORDER_CANCEL_REASONS', []),
     }
 
 # --- ROUTES ---
@@ -610,7 +1059,7 @@ def product_detail(product_id):
                 OrderItem.product_id == product_id
             ).first() is not None
 
-    extra_images_list = json.loads(product.extra_images) if product.extra_images else []
+    extra_images_list = _safe_json_list(product.extra_images)
     return render_template('product-detail.html', product=product, reviews=reviews, is_in_wishlist=is_in_wishlist, can_review=can_review, extra_images_list=extra_images_list)
 
 
@@ -839,15 +1288,27 @@ def checkout():
         return redirect(url_for('cart'))
     coupon_code = session.get('coupon_code')
     totals_preview = _compute_totals_from_items(active_cart.items, coupon_code)
+    checkout_profile = _build_checkout_profile(current_user if current_user.is_authenticated else None)
     if request.method == 'POST':
         shipping_name = request.form.get('shipping_name', '').strip()
-        shipping_phone = request.form.get('shipping_phone', '').strip()
+        shipping_phone = _normalize_phone(request.form.get('shipping_phone', ''))
         shipping_address = request.form.get('shipping_address', '').strip()
         guest_email = request.form.get('guest_email', '').strip().lower()
         note = request.form.get('note', '').strip()
         payment_method = (request.form.get('payment_method') or 'COD').strip().upper()
         if payment_method not in ['COD', 'BANK_TRANSFER', 'MOMO', 'VNPAY']:
             payment_method = 'COD'
+        config_error = _payment_config_error(payment_method)
+        if config_error:
+            flash(config_error, 'error')
+            return redirect(url_for('checkout'))
+
+        if current_user.is_authenticated:
+            shipping_name = shipping_name or current_user.full_name or current_user.username or ''
+            shipping_phone = shipping_phone or _normalize_phone(current_user.phone or '')
+            shipping_address = shipping_address or (current_user.address or '').strip()
+        else:
+            guest_email = guest_email or checkout_profile.get('guest_email', '')
 
         # Basic validation
         if not shipping_name or not shipping_phone or not shipping_address:
@@ -875,58 +1336,104 @@ def checkout():
                 return redirect(url_for('cart'))
         totals = _compute_totals_from_items(active_cart.items, session.get('coupon_code'))
         _, _, db_coupon = _resolve_coupon_by_code(session.get('coupon_code'))
+        checkout_user = current_user if current_user.is_authenticated else None
+        created_guest_user = None
+        pay_url = None
 
+        try:
+            if is_guest:
+                existing_user = User.query.filter(func.lower(User.email) == guest_email.lower()).first()
+                if existing_user:
+                    flash('Email này đã có tài khoản. Vui lòng đăng nhập — giỏ hàng của bạn sẽ được giữ nguyên!', 'error')
+                    return redirect(url_for('login', next=url_for('checkout')))
 
-        if is_guest:
-            # Handle guest checkout securely
-            user = User.query.filter_by(email=guest_email).first()
-            if user:
-                flash('Email này đã có tài khoản. Vui lòng đăng nhập — giỏ hàng của bạn sẽ được giữ nguyên!', 'error')
-                return redirect(url_for('login', next=url_for('checkout')))
+                uname = f"guest_{uuid.uuid4().hex[:8]}"
+                rand_pw = uuid.uuid4().hex + uuid.uuid4().hex
+                guest_last_name, guest_first_name = _split_shipping_name(shipping_name)
+                created_guest_user = User(
+                    username=uname,
+                    first_name=guest_first_name or None,
+                    last_name=guest_last_name or None,
+                    email=guest_email,
+                    phone=shipping_phone,
+                    address=shipping_address,
+                    password_hash=generate_password_hash(rand_pw),
+                    policy_accepted_at=datetime.utcnow(),
+                )
+                db.session.add(created_guest_user)
+                db.session.flush()
+                checkout_user = created_guest_user
+            else:
+                profile_changed = False
+                parsed_last_name, parsed_first_name = _split_shipping_name(shipping_name)
+                if shipping_phone != _normalize_phone(current_user.phone or ''):
+                    current_user.phone = shipping_phone
+                    profile_changed = True
+                if shipping_address != (current_user.address or '').strip():
+                    current_user.address = shipping_address
+                    profile_changed = True
+                if parsed_first_name and not (current_user.first_name or '').strip():
+                    current_user.first_name = parsed_first_name
+                    profile_changed = True
+                if parsed_last_name and not (current_user.last_name or '').strip():
+                    current_user.last_name = parsed_last_name
+                    profile_changed = True
+                if profile_changed:
+                    db.session.flush()
 
-            uname = f"guest_{uuid.uuid4().hex[:8]}"
-            # Create a random password hash (user can later add real password if you implement it)
-            rand_pw = uuid.uuid4().hex + uuid.uuid4().hex
-            user = User(username=uname, email=guest_email, password_hash=generate_password_hash(rand_pw))
-            db.session.add(user)
+            order, materialized_items = _create_order_from_items(
+                user_id=checkout_user.id,
+                items=active_cart.items,
+                shipping_name=shipping_name,
+                shipping_phone=shipping_phone,
+                shipping_address=shipping_address,
+                note=note,
+                payment_method=payment_method,
+                totals=totals,
+                db_coupon=db_coupon,
+            )
+
+            if not is_guest:
+                for item in materialized_items:
+                    db.session.delete(item)
+
+            if payment_method == 'MOMO':
+                pay_url = _prepare_momo_payment(order)
+            elif payment_method == 'VNPAY':
+                pay_url = _prepare_vnpay_payment(order)
+
             db.session.commit()
-            
-            login_user(user)
-            _merge_session_cart_into_user_cart(user)
-            active_cart = _get_or_create_user_cart(user.id)
-            is_guest = False
+        except ValueError as exc:
+            db.session.rollback()
+            flash(str(exc), 'error')
+            return redirect(url_for('checkout'))
+        except Exception:
+            db.session.rollback()
+            app.logger.exception("Checkout failed for payment_method=%s", payment_method)
+            flash('Không thể tạo đơn hàng lúc này. Vui lòng thử lại.', 'error')
+            return redirect(url_for('checkout'))
 
-        order = Order(
-            user_id=current_user.id,
-            total_amount=float(totals['grand_total']),
-            status='pending',
-            shipping_name=shipping_name,
-            shipping_phone=shipping_phone,
-            shipping_address=shipping_address,
-            note=note,
-            payment_method=payment_method,
-            payment_status='initiated' if payment_method in ['MOMO', 'VNPAY'] else 'unpaid'
-        )
-        db.session.add(order)
-        db.session.flush()
-        for item in active_cart.items:
-            oi = OrderItem(order_id=order.id, product_id=item.product_id,
-                           quantity=item.quantity, price=item.product.price)
-            db.session.add(oi)
-            # Decrease stock (simple approach for this demo)
-            if item.product.stock is not None:
-                item.product.stock = max(0, int(item.product.stock) - int(item.quantity))
-        # Clear cart
-        for item in list(active_cart.items):
-            db.session.delete(item)
-        if db_coupon and totals.get("applied_coupon"):
-            db_coupon.used_count = int(db_coupon.used_count or 0) + 1
         session.pop('coupon_code', None)
-        db.session.commit()
+        if is_guest:
+            _session_cart_set({})
+            login_user(created_guest_user)
+        session.modified = True
+
         flash('Đã tạo đơn hàng thành công!', 'success')
+        if pay_url:
+            return redirect(pay_url)
         return redirect(url_for('order_detail', order_id=order.id))
     
-    response = make_response(render_template('checkout.html', cart=active_cart, is_guest=is_guest, totals=totals_preview, coupon_code=coupon_code))
+    response = make_response(
+        render_template(
+            'checkout.html',
+            cart=active_cart,
+            is_guest=is_guest,
+            totals=totals_preview,
+            coupon_code=coupon_code,
+            checkout_profile=checkout_profile,
+        )
+    )
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '-1'
@@ -944,24 +1451,52 @@ def order_detail(order_id):
     return render_template('order-detail.html', order=order, bank_info=bank_info)
 
 
+@app.route('/order/<int:order_id>/cancel', methods=['POST'])
+@login_required
+def cancel_order(order_id):
+    order = Order.query.get_or_404(order_id)
+    if order.user_id != current_user.id and current_user.role != 'admin':
+        flash('Bạn không có quyền hủy đơn hàng này.', 'error')
+        return redirect(url_for('index'))
+
+    cancel_reason, cancel_reason_error = _resolve_cancel_reason_from_form()
+    if cancel_reason_error:
+        flash(cancel_reason_error, 'error')
+        return redirect(url_for('order_detail', order_id=order.id))
+
+    if not _can_cancel_order(order):
+        flash('Đơn hàng đã chuyển sang trạng thái đang giao hoặc hoàn tất nên không thể hủy.', 'error')
+        return redirect(url_for('order_detail', order_id=order.id))
+
+    _cancel_order(order, cancel_reason or '', actor='user')
+    db.session.commit()
+    flash('Đã hủy đơn hàng thành công.', 'success')
+    return redirect(url_for('order_detail', order_id=order.id))
+
+
 @app.route('/order/lookup', methods=['GET', 'POST'])
 def order_lookup():
     found_order = None
     status_steps = []
+    lookup_email = (request.form.get('email') or '').strip().lower()
     if request.method == 'POST':
-        email = (request.form.get('email') or '').strip().lower()
-        phone = (request.form.get('phone') or '').strip()
         order_id = request.form.get('order_id', type=int)
-        if not email or not phone or not order_id:
-            flash('Vui lòng nhập email, số điện thoại và mã đơn.', 'error')
-            return render_template('order-lookup.html', found_order=None)
-        found_order = Order.query.join(User, Order.user_id == User.id).filter(
+        if current_user.is_authenticated and not lookup_email:
+            lookup_email = (current_user.email or '').strip().lower()
+
+        if not order_id or not lookup_email:
+            flash('Vui lòng nhập mã đơn hàng và email đã dùng khi đặt hàng.', 'error')
+            return render_template('order-lookup.html', found_order=None, status_steps=[], lookup_email=lookup_email)
+        if not re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+', lookup_email):
+            flash('Email tra cứu không hợp lệ.', 'error')
+            return render_template('order-lookup.html', found_order=None, status_steps=[], lookup_email=lookup_email)
+
+        found_order = Order.query.join(User).filter(
             Order.id == order_id,
-            User.email == email,
-            Order.shipping_phone == phone
+            func.lower(User.email) == lookup_email
         ).first()
         if not found_order:
-            flash('Không tìm thấy đơn hàng phù hợp.', 'error')
+            flash('Không tìm thấy đơn hàng phù hợp với thông tin đã nhập.', 'error')
         else:
             flash('Đã tìm thấy đơn hàng.', 'success')
             steps = ['pending', 'paid', 'shipped', 'delivered']
@@ -980,7 +1515,7 @@ def order_lookup():
                         }[step],
                         'done': steps.index(step) <= steps.index(reached) if reached in steps else False
                     })
-    return render_template('order-lookup.html', found_order=found_order, status_steps=status_steps)
+    return render_template('order-lookup.html', found_order=found_order, status_steps=status_steps, lookup_email=lookup_email)
 
 
 def _mark_order_paid(order: Order, payment_ref: Optional[str] = None):
@@ -999,95 +1534,26 @@ def momo_create(order_id):
     if order.user_id != current_user.id and current_user.role != 'admin':
         flash('Bạn không có quyền thanh toán đơn hàng này.', 'error')
         return redirect(url_for('index'))
+    if order.status == 'cancelled':
+        flash('Đơn hàng đã bị hủy nên không thể tạo thanh toán MoMo.', 'error')
+        return redirect(url_for('order_detail', order_id=order.id))
     if order.payment_status == 'paid':
         return redirect(url_for('order_detail', order_id=order.id))
     if order.payment_method != 'MOMO':
         flash('Đơn hàng này không chọn MoMo.', 'error')
         return redirect(url_for('order_detail', order_id=order.id))
-
-    partner_code = app.config.get('MOMO_PARTNER_CODE', '')
-    access_key = app.config.get('MOMO_ACCESS_KEY', '')
-    secret_key = app.config.get('MOMO_SECRET_KEY', '')
-    endpoint = app.config.get('MOMO_ENDPOINT')
-    if not partner_code or not access_key or not secret_key:
-        flash('Chưa cấu hình MoMo merchant (MOMO_PARTNER_CODE/MOMO_ACCESS_KEY/MOMO_SECRET_KEY).', 'error')
-        return redirect(url_for('order_detail', order_id=order.id))
-
-    request_id = f"{order.id}-{uuid.uuid4().hex}"
-    momo_order_id = f"UTH{order.id}"
-    amount = int(round(order.total_amount))
-    order_info = f"Thanh toan don hang #{order.id}"
-    redirect_url = _absolute_url('momo_return')
-    ipn_url = _absolute_url('momo_ipn')
-    request_type = "captureWallet"
-    extra_data = ""
-
-    # Ép kiểu amount thành string của số nguyên
-    amount_str = str(int(amount))
-    
-    # Thứ tự phải chuẩn 100% như thế này
-    raw_signature = (
-        f"accessKey={access_key}"
-        f"&amount={amount_str}"
-        f"&extraData={extra_data}"
-        f"&ipnUrl={ipn_url}"
-        f"&orderId={momo_order_id}"
-        f"&orderInfo={order_info}"
-        f"&partnerCode={partner_code}"
-        f"&redirectUrl={redirect_url}"
-        f"&requestId={request_id}"
-        f"&requestType={request_type}"
-    )
-    signature = _hmac_sha256(secret_key, raw_signature)
-
-    payload = {
-        "partnerCode": partner_code,
-        "partnerName": "Test Store", # Thêm dòng này cho chắc
-        "storeId": "MomoTestStore",  # Thêm dòng này cho chắc
-        "requestId": request_id,
-        "amount": amount_str,        # Dùng amount_str đã ép kiểu ở trên
-        "orderId": momo_order_id,
-        "orderInfo": order_info,
-        "redirectUrl": redirect_url,
-        "ipnUrl": ipn_url,
-        "lang": "vi",
-        "extraData": extra_data,
-        "requestType": request_type,
-        "signature": signature,
-    }
-
-    tx = PaymentTransaction(
-        order_id=order.id,
-        provider='MOMO',
-        amount=float(amount),
-        status='initiated',
-        provider_ref=momo_order_id,
-        raw_request=json.dumps(payload, ensure_ascii=False),
-    )
-    db.session.add(tx)
-    db.session.commit()
-
     try:
-        resp = requests.post(endpoint, json=payload, timeout=20)
-        data = resp.json()
+        pay_url = _prepare_momo_payment(order)
+        db.session.commit()
+    except ValueError as exc:
+        db.session.commit()
+        flash(str(exc), 'error')
+        return redirect(url_for('order_detail', order_id=order.id))
     except Exception:
-        tx.status = 'failed'
-        db.session.commit()
-        flash('Không kết nối được MoMo. Vui lòng thử lại.', 'error')
+        db.session.rollback()
+        app.logger.exception("Không thể tạo thanh toán MoMo cho order_id=%s", order.id)
+        flash('Không thể tạo thanh toán MoMo lúc này. Vui lòng thử lại.', 'error')
         return redirect(url_for('order_detail', order_id=order.id))
-
-    tx.raw_response = json.dumps(data, ensure_ascii=False)
-    db.session.commit()
-
-    pay_url = data.get('payUrl') or data.get('deeplink') or data.get('qrCodeUrl')
-    if not pay_url or int(data.get('resultCode', -1)) != 0:
-        tx.status = 'failed'
-        db.session.commit()
-        flash('Tạo thanh toán MoMo thất bại. Vui lòng thử lại.', 'error')
-        return redirect(url_for('order_detail', order_id=order.id))
-
-    order.payment_status = 'initiated'
-    db.session.commit()
     return redirect(pay_url)
 
 
@@ -1095,11 +1561,18 @@ def momo_create(order_id):
 @login_required
 def momo_return():
     # This is browser return URL. Final confirmation should rely on IPN.
-    order_id = request.args.get('orderId', '')
-    # orderId is like UTH123; extract numeric part if possible
-    num = ''.join([c for c in order_id if c.isdigit()])
-    if num.isdigit():
-        return redirect(url_for('order_detail', order_id=int(num)))
+    order_id = _extract_momo_order_id(
+        request.args.get('orderId', ''),
+        request.args.get('extraData', '')
+    )
+    if order_id:
+        result_code = request.args.get('resultCode', type=int)
+        if result_code and result_code != 0:
+            order = Order.query.get(order_id)
+            if order and order.payment_status != 'paid':
+                order.payment_status = 'failed'
+                db.session.commit()
+        return redirect(url_for('order_detail', order_id=order_id))
     flash('Không xác định được đơn hàng từ MoMo.', 'error')
     return redirect(url_for('index'))
 
@@ -1137,11 +1610,10 @@ def momo_ipn():
     if signature != expected:
         return jsonify({"message": "invalid_signature"}), 400
 
-    order_id = data.get('orderId', '')
-    num = ''.join([c for c in order_id if c.isdigit()])
-    if not num.isdigit():
+    order_id = _extract_momo_order_id(data.get('orderId', ''), data.get('extraData', ''))
+    if not order_id:
         return jsonify({"message": "invalid_order"}), 400
-    order = Order.query.get(int(num))
+    order = Order.query.get(order_id)
     if not order:
         return jsonify({"message": "order_not_found"}), 404
 
@@ -1183,55 +1655,26 @@ def vnpay_create(order_id):
     if order.user_id != current_user.id and current_user.role != 'admin':
         flash('Bạn không có quyền thanh toán đơn hàng này.', 'error')
         return redirect(url_for('index'))
+    if order.status == 'cancelled':
+        flash('Đơn hàng đã bị hủy nên không thể tạo thanh toán VNPAY.', 'error')
+        return redirect(url_for('order_detail', order_id=order.id))
     if order.payment_status == 'paid':
         return redirect(url_for('order_detail', order_id=order.id))
     if order.payment_method != 'VNPAY':
         flash('Đơn hàng này không chọn VNPAY.', 'error')
         return redirect(url_for('order_detail', order_id=order.id))
-
-    tmn_code = app.config.get('VNPAY_TMN_CODE', '')
-    hash_secret = app.config.get('VNPAY_HASH_SECRET', '')
-    vnp_url = app.config.get('VNPAY_URL', '')
-    if not tmn_code or not hash_secret:
-        flash('Chưa cấu hình VNPAY merchant (VNPAY_TMN_CODE/VNPAY_HASH_SECRET).', 'error')
+    try:
+        pay_url = _prepare_vnpay_payment(order)
+        db.session.commit()
+    except ValueError as exc:
+        db.session.rollback()
+        flash(str(exc), 'error')
         return redirect(url_for('order_detail', order_id=order.id))
-
-    amount = int(round(order.total_amount)) * 100  # VNPAY uses smallest unit
-    create_date = (datetime.utcnow() + timedelta(hours=7)).strftime("%Y%m%d%H%M%S")
-    expire_date = (datetime.utcnow() + timedelta(hours=7, minutes=15)).strftime("%Y%m%d%H%M%S")
-    vnp_params = {
-        "vnp_Version": "2.1.0",
-        "vnp_Command": "pay",
-        "vnp_TmnCode": tmn_code,
-        "vnp_Amount": str(amount),
-        "vnp_CurrCode": "VND",
-        "vnp_TxnRef": f"{order.id}",
-        "vnp_OrderInfo": f"Thanh toan don hang #{order.id}",
-        "vnp_OrderType": "other",
-        "vnp_Locale": "vn",
-        "vnp_ReturnUrl": _absolute_url('vnpay_return'),
-        "vnp_IpAddr": request.headers.get('X-Forwarded-For', request.remote_addr) or "127.0.0.1",
-        "vnp_CreateDate": create_date,
-        "vnp_ExpireDate": expire_date,
-    }
-    # Build signed query
-    sorted_items = sorted(vnp_params.items())
-    hashdata = "&".join([f"{k}={urllib.parse.quote_plus(str(v))}" for k, v in sorted_items])
-    secure_hash = _vnpay_hmac_sha512(hash_secret, hashdata)
-    query = urllib.parse.urlencode(sorted_items, quote_via=urllib.parse.quote_plus)
-    pay_url = f"{vnp_url}?{query}&vnp_SecureHash={secure_hash}"
-
-    tx = PaymentTransaction(
-        order_id=order.id,
-        provider='VNPAY',
-        amount=float(int(round(order.total_amount))),
-        status='initiated',
-        provider_ref=str(order.id),
-        raw_request=json.dumps(vnp_params, ensure_ascii=False),
-    )
-    db.session.add(tx)
-    order.payment_status = 'initiated'
-    db.session.commit()
+    except Exception:
+        db.session.rollback()
+        app.logger.exception("Không thể tạo thanh toán VNPAY cho order_id=%s", order.id)
+        flash('Không thể tạo thanh toán VNPAY lúc này. Vui lòng thử lại.', 'error')
+        return redirect(url_for('order_detail', order_id=order.id))
     return redirect(pay_url)
 
 
@@ -1254,9 +1697,16 @@ def vnpay_return():
         flash('Chữ ký VNPAY không hợp lệ.', 'error')
         return redirect(url_for('index'))
 
-    txn_ref = args.get('vnp_TxnRef')
-    if txn_ref and str(txn_ref).isdigit():
-        return redirect(url_for('order_detail', order_id=int(txn_ref)))
+    txn_ref = args.get('vnp_TxnRef', '')
+    order_id = _extract_vnpay_order_id(txn_ref)
+    if order_id:
+        resp_code = args.get('vnp_ResponseCode')
+        if resp_code and resp_code != '00':
+            order = Order.query.get(order_id)
+            if order and order.payment_status != 'paid':
+                order.payment_status = 'failed'
+                db.session.commit()
+        return redirect(url_for('order_detail', order_id=order_id))
     flash('Không xác định được đơn hàng từ VNPAY.', 'error')
     return redirect(url_for('index'))
 
@@ -1284,9 +1734,10 @@ def vnpay_ipn():
     resp_code = args.get('vnp_ResponseCode')
     amount = args.get('vnp_Amount')
     trans_no = args.get('vnp_TransactionNo')
-    if not txn_ref or not str(txn_ref).isdigit():
+    order_id = _extract_vnpay_order_id(txn_ref or '')
+    if not order_id:
         return "invalid_order", 400
-    order = Order.query.get(int(txn_ref))
+    order = Order.query.get(order_id)
     if not order:
         return "order_not_found", 404
 
@@ -1349,23 +1800,55 @@ def login():
 @app.route('/register', methods=['POST'])
 @limiter.limit("10 per minute")
 def register():
-    name = (request.form.get('name') or '').strip()
-    email = (request.form.get('email') or '').strip()
-    password = request.form.get('password')
+    first_name = (request.form.get('first_name') or '').strip()
+    last_name = (request.form.get('last_name') or '').strip()
+    username = (request.form.get('username') or '').strip()
+    email = (request.form.get('email') or '').strip().lower()
+    password = request.form.get('password') or ''
+    confirm_password = request.form.get('confirm_password') or ''
+    agreed_policy = bool(request.form.get('agree_policy'))
+
+    if not first_name or not last_name or not username or not email or not password:
+        flash('Vui lòng điền đầy đủ Họ, Tên, Tên đăng nhập, Email và Mật khẩu.', 'error')
+        return redirect(url_for('login') + '#register')
+
+    if not agreed_policy:
+        flash('Bạn cần đồng ý với chính sách và điều khoản trước khi đăng ký.', 'error')
+        return redirect(url_for('login') + '#register')
+
+    if not re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+', email):
+        flash('Email không hợp lệ.', 'error')
+        return redirect(url_for('login') + '#register')
+
+    if not re.fullmatch(r'^[A-Za-z0-9_.-]{4,30}$', username):
+        flash('Tên đăng nhập chỉ gồm chữ cái, số, dấu chấm, gạch dưới hoặc gạch ngang và dài 4-30 ký tự.', 'error')
+        return redirect(url_for('login') + '#register')
+
+    pw_pattern = re.compile(r'^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}$')
+    if not pw_pattern.match(password):
+        flash('Mật khẩu phải có ít nhất 8 ký tự, gồm chữ HOA, chữ thường và số.', 'error')
+        return redirect(url_for('login') + '#register')
+
+    if password != confirm_password:
+        flash('Xác nhận mật khẩu không khớp.', 'error')
+        return redirect(url_for('login') + '#register')
 
     # Kiểm tra trùng lập không phân biệt hoa thường để tránh tạo ra 2 tài khoản "Hana" và "hana"
     if User.query.filter(func.lower(User.email) == email.lower()).first():
         flash('Email này đã được sử dụng. Vui lòng dùng email khác.', 'error')
         return redirect(url_for('login') + '#register')
         
-    if User.query.filter(func.lower(User.username) == name.lower()).first():
-        flash('Tên đăng nhập (Họ và tên) này đã được sử dụng. Vui lòng chọn tên khác hoặc thêm số phía sau.', 'error')
+    if User.query.filter(func.lower(User.username) == username.lower()).first():
+        flash('Tên đăng nhập này đã được sử dụng. Vui lòng chọn tên khác.', 'error')
         return redirect(url_for('login') + '#register')
 
     new_user = User(
-        username=name,
+        username=username,
+        first_name=first_name,
+        last_name=last_name,
         email=email,
-        password_hash=generate_password_hash(password, method='pbkdf2:sha256')
+        password_hash=generate_password_hash(password, method='pbkdf2:sha256'),
+        policy_accepted_at=datetime.utcnow(),
     )
     db.session.add(new_user)
     db.session.commit()
@@ -1383,25 +1866,35 @@ def logout():
 @app.route('/forgot-password', methods=['GET', 'POST'])
 @limiter.limit("10 per hour")
 def forgot_password():
-    """Tạo token reset mật khẩu và hiển thị link trực tiếp (demo mode — không cần SMTP)."""
+    """Tạo token reset mật khẩu và gửi qua email hoặc console log an toàn."""
     if current_user.is_authenticated:
         return redirect(url_for('index'))
 
-    reset_link = None
+    entered_email = (request.form.get('email') or request.args.get('email') or '').strip()
     if request.method == 'POST':
-        email = (request.form.get('email') or '').strip().lower()
+        email = entered_email.lower()
         if not email:
             flash('Vui lòng nhập địa chỉ email.', 'error')
+        elif not re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+', email):
+            flash('Địa chỉ email không hợp lệ.', 'error')
         else:
+            delivery_failed = False
             user = User.query.filter(func.lower(User.email) == email).first()
             if user:
-                token = user.generate_reset_token(expires_minutes=30)
-                db.session.commit()
-                reset_link = url_for('reset_password', token=token, _external=False)
-            # Luôn hiện thông báo thành công để tránh lộ email tồn tại (security best practice)
-            flash('Nếu email tồn tại trong hệ thống, liên kết đặt lại mật khẩu sẽ xuất hiện bên dưới.', 'info')
+                token = user.generate_reset_token(expires_minutes=int(app.config.get('PASSWORD_RESET_EXPIRES_MINUTES') or 30))
+                # Use the current request host for password reset links so local demos
+                # are not blocked by stale PUBLIC_URL/ngrok values.
+                reset_url = url_for('reset_password', token=token, _external=True)
+                if _send_password_reset_email(user, reset_url):
+                    db.session.commit()
+                else:
+                    db.session.rollback()
+                    delivery_failed = True
+            flash('Nếu email tồn tại trong hệ thống, chúng tôi đã gửi hướng dẫn đặt lại mật khẩu.', 'info')
+            if delivery_failed:
+                flash('Dịch vụ email đang tạm thời gián đoạn. Vui lòng thử lại sau hoặc liên hệ quản trị viên.', 'error')
 
-    return render_template('forgot-password.html', reset_link=reset_link)
+    return render_template('forgot-password.html', entered_email=entered_email)
 
 
 @app.route('/reset-password/<token>', methods=['GET', 'POST'])
@@ -1411,9 +1904,13 @@ def reset_password(token):
     if current_user.is_authenticated:
         return redirect(url_for('index'))
 
-    user = User.query.filter_by(reset_token=token).first()
+    token_hash = User.hash_reset_token(token)
+    user = User.query.filter(
+        or_(User.reset_token == token_hash, User.reset_token == token)
+    ).first()
+    token_matches = bool(user and user.reset_token in {token_hash, token})
 
-    if not user or not user.is_reset_token_valid():
+    if not user or not token_matches or not user.is_reset_token_valid():
         flash('Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn. Vui lòng thử lại.', 'error')
         return redirect(url_for('forgot_password'))
 
@@ -1543,6 +2040,9 @@ def get_analytics_data():
 
     # Đơn hàng gần đây
     recent_orders = Order.query.order_by(Order.created_at.desc()).limit(10).all()
+    recent_cancelled_orders = Order.query.filter_by(status='cancelled')\
+        .order_by(Order.cancelled_at.desc(), Order.created_at.desc())\
+        .limit(5).all()
 
     # Order status breakdown
     status_counts = {
@@ -1568,6 +2068,7 @@ def get_analytics_data():
         'category_labels': category_labels,
         'category_data': category_data,
         'recent_orders': recent_orders,
+        'recent_cancelled_orders': recent_cancelled_orders,
         'status_counts': status_counts,
     }
 
@@ -1826,9 +2327,25 @@ def admin_update_order_status(order_id):
     order = Order.query.get_or_404(order_id)
     new_status = request.form.get('status')
     if new_status in ['pending', 'paid', 'shipped', 'delivered', 'cancelled']:
-        order.status = new_status
-        db.session.commit()
-        flash(f'Đã cập nhật trạng thái đơn hàng #{order_id}.', 'success')
+        if order.status == 'cancelled' and new_status != 'cancelled':
+            flash(f'Đơn hàng #{order_id} đã bị hủy và không thể chuyển lại trạng thái khác.', 'error')
+            return redirect(url_for('admin_dashboard') + '?tab=orders')
+        if new_status in ['shipped', 'delivered'] and order.payment_method in ['MOMO', 'VNPAY'] and order.payment_status != 'paid':
+            flash(f'Không thể chuyển đơn #{order_id} sang trạng thái giao hàng khi thanh toán online chưa hoàn tất.', 'error')
+            return redirect(url_for('admin_dashboard') + '?tab=orders')
+        if new_status == 'cancelled':
+            if order.status != 'cancelled':
+                _cancel_order(order, request.form.get('cancel_reason') or '', actor='admin')
+                db.session.commit()
+            flash(f'Đã hủy đơn hàng #{order_id}.', 'success')
+        else:
+            order.status = new_status
+            if new_status == 'paid':
+                order.payment_status = 'paid'
+            elif new_status == 'delivered' and order.payment_method == 'COD' and order.payment_status != 'paid':
+                order.payment_status = 'paid'
+            db.session.commit()
+            flash(f'Đã cập nhật trạng thái đơn hàng #{order_id}.', 'success')
     return redirect(url_for('admin_dashboard') + '?tab=orders')
 
 
@@ -1849,22 +2366,43 @@ def profile():
         action = request.form.get('action', '')
 
         if action == 'update_info':
+            first_name = request.form.get('first_name', '').strip()
+            last_name = request.form.get('last_name', '').strip()
             username = request.form.get('username', '').strip()
-            email    = request.form.get('email', '').strip().lower()
-            if not username or not email:
-                flash('Vui lòng điền đầy đủ thông tin.', 'error')
+            email = request.form.get('email', '').strip().lower()
+            phone = _normalize_phone(request.form.get('phone', ''))
+            address = request.form.get('address', '').strip()
+            birth_date_raw = request.form.get('birth_date', '').strip()
+            birth_date = _parse_birth_date(birth_date_raw)
+
+            if not first_name or not last_name or not username or not email:
+                flash('Vui lòng điền đầy đủ Họ, Tên, Tên đăng nhập và Email.', 'error')
                 return redirect(url_for('profile'))
             if not re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+', email):
                 flash('Email không hợp lệ.', 'error')
                 return redirect(url_for('profile'))
-            if User.query.filter(User.username == username, User.id != current_user.id).first():
+            if not re.fullmatch(r'^[A-Za-z0-9_.-]{4,30}$', username):
+                flash('Tên đăng nhập chỉ gồm chữ cái, số, dấu chấm, gạch dưới hoặc gạch ngang và dài 4-30 ký tự.', 'error')
+                return redirect(url_for('profile'))
+            if phone and not re.fullmatch(r'(0|\+84)\d{9,10}', phone):
+                flash('Số điện thoại không hợp lệ.', 'error')
+                return redirect(url_for('profile'))
+            if birth_date_raw and not birth_date:
+                flash('Ngày sinh không hợp lệ.', 'error')
+                return redirect(url_for('profile'))
+            if User.query.filter(func.lower(User.username) == username.lower(), User.id != current_user.id).first():
                 flash('Tên đăng nhập đã được sử dụng bởi tài khoản khác.', 'error')
                 return redirect(url_for('profile'))
-            if User.query.filter(User.email == email, User.id != current_user.id).first():
+            if User.query.filter(func.lower(User.email) == email.lower(), User.id != current_user.id).first():
                 flash('Email đã được sử dụng bởi tài khoản khác.', 'error')
                 return redirect(url_for('profile'))
+            current_user.first_name = first_name
+            current_user.last_name = last_name
             current_user.username = username
-            current_user.email    = email
+            current_user.email = email
+            current_user.phone = phone or None
+            current_user.address = address or None
+            current_user.birth_date = birth_date
             db.session.commit()
             flash('Cập nhật thông tin thành công!', 'success')
 
@@ -1896,14 +2434,9 @@ def profile():
 
 
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
-        ensure_db_schema()
-        ensure_order_schema()
-        ensure_user_schema()
-        missing_payment_env = _missing_payment_env_vars()
-        if missing_payment_env and not _is_debug_mode:
-            raise RuntimeError(f"Missing payment environment variables: {missing_payment_env}")
+    missing_payment_env = _missing_payment_env_vars()
+    if missing_payment_env and not _is_debug_mode:
+        raise RuntimeError(f"Missing payment environment variables: {missing_payment_env}")
     debug = os.environ.get('FLASK_DEBUG', '').strip() in ['1', 'true', 'True']
-    port = int(os.environ.get('PORT', '5000'))
+    port = int(os.environ.get('PORT', '5011'))
     app.run(debug=debug, port=port)

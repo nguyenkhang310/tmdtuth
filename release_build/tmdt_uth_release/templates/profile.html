@@ -1,0 +1,455 @@
+{% extends "base.html" %}
+{% block title %}Thông tin tài khoản – {{ shop.name }}{% endblock %}
+
+{% block extra_styles %}
+<style>
+.account-hero {
+    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 60%, var(--primary-light) 100%);
+    padding: 3.5rem 2rem 2.5rem;
+    color: white;
+}
+.account-hero-inner {
+    max-width: 1100px; margin: 0 auto;
+    display: flex; align-items: center; gap: 1.5rem;
+}
+.account-hero-avatar {
+    width: 64px; height: 64px; border-radius: 50%;
+    background: rgba(255,255,255,0.18);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2rem; flex-shrink: 0;
+    border: 3px solid rgba(255,255,255,0.35);
+}
+.account-hero h1 {
+    font-family: inherit;
+    font-size: 2rem; font-weight: 700; margin-bottom: 0.25rem;
+}
+.account-hero p { opacity: 0.82; font-size: 0.9rem; }
+
+.account-tabs {
+    background: white;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 72px; z-index: 50;
+}
+.account-tabs-inner {
+    max-width: 1100px; margin: 0 auto; padding: 0 2rem;
+    display: flex; gap: 0;
+}
+.account-tabs a {
+    display: flex; align-items: center; gap: 0.45rem;
+    padding: 1rem 1.25rem;
+    font-size: 0.875rem; font-weight: 600;
+    color: var(--text-muted);
+    text-decoration: none;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+.account-tabs a:hover { color: var(--primary); }
+.account-tabs a.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+.profile-section {
+    max-width: 1100px; margin: 2.5rem auto; padding: 0 2rem;
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 1.5rem;
+    align-items: start;
+}
+
+/* Sidebar stats */
+.profile-sidebar {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    position: sticky; top: 140px;
+}
+.profile-sidebar-head {
+    background: linear-gradient(135deg, var(--primary), var(--primary-light));
+    padding: 2rem 1.5rem;
+    text-align: center; color: white;
+}
+.profile-avatar-big {
+    width: 80px; height: 80px; border-radius: 50%;
+    background: rgba(255,255,255,0.22);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2.5rem;
+    margin: 0 auto 1rem;
+    border: 3px solid rgba(255,255,255,0.4);
+}
+.profile-sidebar-head h3 {
+    font-family: inherit;
+    font-size: 1.1rem; font-weight: 700;
+    word-break: break-word;
+}
+.profile-sidebar-head p { font-size: 0.8rem; opacity: 0.8; margin-top: 0.2rem; word-break: break-all; }
+.profile-sidebar-stats {
+    display: flex; flex-direction: column;
+}
+.profile-stat {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.9rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.875rem;
+}
+.profile-stat:last-child { border-bottom: none; }
+.profile-stat-label { color: var(--text-muted); display: flex; align-items: center; gap: 0.4rem; }
+.profile-stat-value { font-weight: 700; color: var(--text); }
+
+/* Cards */
+.profile-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+}
+.profile-card-header {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 0.65rem;
+    background: #fafaf9;
+}
+.profile-card-header h2 {
+    font-size: 1rem; font-weight: 700; color: var(--text);
+}
+.profile-card-header .material-symbols-outlined {
+    color: var(--primary); font-size: 1.2rem;
+}
+.profile-card-body { padding: 1.5rem; }
+
+.form-row {
+    display: grid; gap: 1.25rem;
+    grid-template-columns: 1fr 1fr;
+    margin-bottom: 1.25rem;
+}
+.form-row.single { grid-template-columns: 1fr; }
+
+.form-group { display: flex; flex-direction: column; gap: 0.4rem; }
+.form-label {
+    font-size: 0.82rem; font-weight: 600;
+    color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;
+}
+.form-input {
+    padding: 0.75rem 1rem;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    font-size: 0.9rem; font-family: inherit;
+    outline: none; transition: all 0.2s;
+    background: #fafaf9;
+}
+.form-input:focus {
+    border-color: var(--primary);
+    background: white;
+    box-shadow: 0 0 0 3px rgba(10,92,54,0.08);
+}
+.form-input[readonly] {
+    background: var(--surface2); color: var(--text-muted); cursor: default;
+}
+.form-hint { font-size: 0.78rem; color: var(--text-muted); }
+.full-row { grid-column: 1 / -1; }
+.textarea-input {
+    min-height: 96px;
+    resize: vertical;
+}
+
+.form-divider {
+    border: none; border-top: 1px solid var(--border);
+    margin: 1.5rem 0;
+}
+.form-actions { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 0.5rem; }
+
+.role-badge {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px; font-size: 0.78rem; font-weight: 700;
+    margin-left: auto;
+}
+.role-admin { background: #fef3c7; color: #92400e; }
+.role-user  { background: #dbeafe; color: #1e40af; }
+
+.pw-toggle {
+    position: relative;
+}
+.pw-toggle .form-input { padding-right: 2.75rem; }
+.pw-toggle-btn {
+    position: absolute; right: 0.75rem; top: 50%;
+    transform: translateY(-50%);
+    background: none; border: none; cursor: pointer;
+    color: var(--text-muted); display: flex; align-items: center;
+    transition: color 0.2s;
+}
+.pw-toggle-btn:hover { color: var(--primary); }
+
+@media (max-width: 900px) {
+    .profile-section { grid-template-columns: 1fr; }
+    .profile-sidebar { position: static; }
+}
+@media (max-width: 640px) {
+    .form-row { grid-template-columns: 1fr; }
+    .account-hero h1 { font-size: 1.5rem; }
+    .account-hero { padding: 2.75rem 1rem 2rem; }
+    .account-hero-inner,
+    .account-tabs-inner,
+    .profile-section { padding-left: 1rem; padding-right: 1rem; }
+    .account-tabs-inner {
+        overflow-x: auto;
+        scrollbar-width: thin;
+    }
+    .profile-card-body { padding: 1rem; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Hero -->
+<div class="account-hero">
+    <div class="account-hero-inner">
+        <div class="account-hero-avatar">
+            <span class="material-symbols-outlined">person</span>
+        </div>
+        <div>
+            <h1>{{ current_user.display_name }}</h1>
+            <p>{{ current_user.email }}</p>
+        </div>
+    </div>
+</div>
+
+<!-- Tabs -->
+<div class="account-tabs">
+    <div class="account-tabs-inner">
+        <a href="{{ url_for('my_orders') }}">
+            <span class="material-symbols-outlined" style="font-size:1.05rem">receipt_long</span>
+            Đơn hàng của tôi
+        </a>
+        <a href="{{ url_for('profile') }}" class="active">
+            <span class="material-symbols-outlined" style="font-size:1.05rem">manage_accounts</span>
+            Thông tin tài khoản
+        </a>
+        <a href="{{ url_for('wishlist') }}">
+            <span class="material-symbols-outlined" style="font-size:1.05rem">favorite</span>
+            Yêu thích
+        </a>
+    </div>
+</div>
+
+<div class="profile-section">
+    <!-- Sidebar -->
+    <aside class="profile-sidebar">
+        <div class="profile-sidebar-head">
+            <div class="profile-avatar-big">
+                <span class="material-symbols-outlined">person</span>
+            </div>
+            <h3>{{ current_user.display_name }}</h3>
+            <p>{{ current_user.email }}</p>
+        </div>
+        <div class="profile-sidebar-stats">
+            <div class="profile-stat">
+                <span class="profile-stat-label">
+                    <span class="material-symbols-outlined" style="font-size:1rem">receipt_long</span>
+                    Đơn hàng
+                </span>
+                <span class="profile-stat-value">{{ order_count }}</span>
+            </div>
+            <div class="profile-stat">
+                <span class="profile-stat-label">
+                    <span class="material-symbols-outlined" style="font-size:1rem">shield_person</span>
+                    Vai trò
+                </span>
+                <span class="role-badge {% if current_user.role == 'admin' %}role-admin{% else %}role-user{% endif %}">
+                    {{ 'Admin' if current_user.role == 'admin' else 'Khách hàng' }}
+                </span>
+            </div>
+            <div class="profile-stat">
+                <span class="profile-stat-label">
+                    <span class="material-symbols-outlined" style="font-size:1rem">badge</span>
+                    ID
+                </span>
+                <span class="profile-stat-value">#{{ current_user.id }}</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main content -->
+    <div>
+        <!-- Update Info Card -->
+        <div class="profile-card">
+            <div class="profile-card-header">
+                <span class="material-symbols-outlined">edit</span>
+                <h2>Cập nhật thông tin</h2>
+            </div>
+            <div class="profile-card-body">
+                <form method="POST" action="{{ url_for('profile') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="action" value="update_info">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="last_name">Họ và tên đệm</label>
+                            <input class="form-input" type="text" id="last_name" name="last_name"
+                                   value="{{ current_user.last_name or '' }}" required autocomplete="family-name">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="first_name">Tên</label>
+                            <input class="form-input" type="text" id="first_name" name="first_name"
+                                   value="{{ current_user.first_name or '' }}" required autocomplete="given-name">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="username">Tên đăng nhập</label>
+                            <input class="form-input" type="text" id="username" name="username"
+                                   value="{{ current_user.username }}" required autocomplete="username">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="email">Email</label>
+                            <input class="form-input" type="email" id="email" name="email"
+                                   value="{{ current_user.email }}" required autocomplete="email">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="phone">Số điện thoại</label>
+                            <input class="form-input" type="tel" id="phone" name="phone"
+                                   value="{{ current_user.phone or '' }}" autocomplete="tel" placeholder="09xxxxxxxx">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="birth_date">Ngày sinh</label>
+                            <input class="form-input" type="date" id="birth_date" name="birth_date"
+                                   value="{{ current_user.birth_date.isoformat() if current_user.birth_date else '' }}" autocomplete="bday">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group full-row">
+                            <label class="form-label" for="address">Địa chỉ</label>
+                            <textarea class="form-input textarea-input" id="address" name="address" autocomplete="street-address" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành">{{ current_user.address or '' }}</textarea>
+                            <span class="form-hint">Thông tin này sẽ được tự động điền ở bước thanh toán.</span>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">
+                            <span class="material-symbols-outlined" style="font-size:1rem">save</span>
+                            Lưu thay đổi
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Change Password Card -->
+        <div class="profile-card">
+            <div class="profile-card-header">
+                <span class="material-symbols-outlined">lock</span>
+                <h2>Đổi mật khẩu</h2>
+            </div>
+            <div class="profile-card-body">
+                <form method="POST" action="{{ url_for('profile') }}" id="pw-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="action" value="change_password">
+                    <div class="form-row single">
+                        <div class="form-group">
+                            <label class="form-label" for="current_password">Mật khẩu hiện tại</label>
+                            <div class="pw-toggle">
+                                <input class="form-input" type="password" id="current_password"
+                                       name="current_password" required autocomplete="current-password">
+                                <button type="button" class="pw-toggle-btn" onclick="togglePw('current_password', this)">
+                                    <span class="material-symbols-outlined" style="font-size:1.1rem">visibility</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="new_password">Mật khẩu mới</label>
+                            <div class="pw-toggle">
+                                <input class="form-input" type="password" id="new_password"
+                                       name="new_password" required minlength="8" autocomplete="new-password">
+                                <button type="button" class="pw-toggle-btn" onclick="togglePw('new_password', this)">
+                                    <span class="material-symbols-outlined" style="font-size:1.1rem">visibility</span>
+                                </button>
+                            </div>
+                            <span class="form-hint">Ít nhất 8 ký tự, bao gồm chữ HOA và chữ số</span>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="confirm_password">Xác nhận mật khẩu mới</label>
+                            <div class="pw-toggle">
+                                <input class="form-input" type="password" id="confirm_password"
+                                       name="confirm_password" required autocomplete="new-password">
+                                <button type="button" class="pw-toggle-btn" onclick="togglePw('confirm_password', this)">
+                                    <span class="material-symbols-outlined" style="font-size:1.1rem">visibility</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="pw-mismatch" style="display:none;color:#dc2626;font-size:0.82rem;margin-bottom:0.75rem;display:none;align-items:center;gap:0.3rem">
+                        <span class="material-symbols-outlined" style="font-size:1rem">error</span>
+                        Xác nhận mật khẩu không khớp.
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary" id="pw-submit-btn">
+                            <span class="material-symbols-outlined" style="font-size:1rem">lock_reset</span>
+                            Đổi mật khẩu
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Danger Zone -->
+        <div class="profile-card" style="border-color:#fee2e2">
+            <div class="profile-card-header" style="background:#fff5f5">
+                <span class="material-symbols-outlined" style="color:#dc2626">warning</span>
+                <h2 style="color:#dc2626">Vùng nguy hiểm</h2>
+            </div>
+            <div class="profile-card-body">
+                <p style="font-size:0.875rem;color:var(--text-muted);margin-bottom:1rem">
+                    Đăng xuất khỏi tài khoản trên thiết bị này.
+                </p>
+                <a href="{{ url_for('logout') }}" class="btn" style="background:#fee2e2;color:#dc2626;border:none">
+                    <span class="material-symbols-outlined" style="font-size:1rem">logout</span>
+                    Đăng xuất
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function togglePw(id, btn) {
+    const input = document.getElementById(id);
+    const icon = btn.querySelector('.material-symbols-outlined');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.textContent = 'visibility_off';
+    } else {
+        input.type = 'password';
+        icon.textContent = 'visibility';
+    }
+}
+
+// Real-time password match check
+const newPw  = document.getElementById('new_password');
+const confPw = document.getElementById('confirm_password');
+const hint   = document.getElementById('pw-mismatch');
+const submitBtn = document.getElementById('pw-submit-btn');
+
+function checkMatch() {
+    if (confPw.value && newPw.value !== confPw.value) {
+        hint.style.display = 'flex';
+        confPw.style.borderColor = '#dc2626';
+    } else {
+        hint.style.display = 'none';
+        confPw.style.borderColor = '';
+    }
+}
+newPw.addEventListener('input', checkMatch);
+confPw.addEventListener('input', checkMatch);
+
+document.getElementById('pw-form').addEventListener('submit', function(e) {
+    if (newPw.value !== confPw.value) {
+        e.preventDefault();
+        hint.style.display = 'flex';
+    }
+});
+</script>
+{% endblock %}

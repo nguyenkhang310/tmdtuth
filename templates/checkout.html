@@ -33,7 +33,19 @@
 .sum-total .val{font-size:1.35rem;font-weight:900;color:var(--primary);}
 .btn-pay{width:100%;padding:1rem;border:none;border-radius:12px;background:var(--primary);color:#fff;font-weight:800;cursor:pointer;font-family:inherit;font-size:1rem;}
 .btn-pay:hover{background:var(--primary-light);transform:translateY(-1px);box-shadow:0 6px 20px rgba(10,92,54,0.25);}
-@media (max-width: 900px){.checkout-page{grid-template-columns:1fr;}.summary{position:static;}}
+.prefill-note{margin-bottom:1rem;padding:0.9rem 1rem;border-radius:12px;background:#eff6ff;color:#1d4ed8;font-size:0.85rem;border:1px solid #bfdbfe;}
+@media (max-width: 900px){
+  .checkout-page{grid-template-columns:1fr;padding:1.5rem 1rem 2rem;gap:1.25rem;}
+  .summary{position:static;}
+}
+@media (max-width: 640px){
+  .card{padding:1.15rem;border-radius:18px;}
+  .title{font-size:1.6rem;}
+  .sub{margin-bottom:1rem;}
+  .radio-row{flex-direction:column;gap:0.65rem;}
+  .radio{min-width:0;padding:0.8rem 0.85rem;}
+  .sum-total .val{font-size:1.6rem;}
+}
 </style>
 {% endblock %}
 
@@ -42,26 +54,31 @@
   <div class="card">
     <div class="title">Thanh toán</div>
     <div class="sub">Vui lòng nhập thông tin nhận hàng và chọn phương thức thanh toán.</div>
+    {% if current_user.is_authenticated %}
+    <div class="prefill-note">
+      Thông tin nhận hàng đã được nạp sẵn từ hồ sơ của bạn. Bạn vẫn có thể chỉnh lại trước khi đặt đơn.
+    </div>
+    {% endif %}
 
     <form method="POST" action="{{ url_for('checkout') }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
       <div class="field">
         <label class="label">Họ và tên *</label>
-        <input class="input" type="text" name="shipping_name" placeholder="Nguyễn Văn A" required>
+        <input class="input" type="text" name="shipping_name" placeholder="Nguyễn Văn A" value="{{ checkout_profile.shipping_name }}" required>
       </div>
       <div class="field">
         <label class="label">Số điện thoại *</label>
-        <input class="input" type="tel" name="shipping_phone" placeholder="09xxxxxxxx" required>
+        <input class="input" type="tel" name="shipping_phone" placeholder="09xxxxxxxx" value="{{ checkout_profile.shipping_phone }}" required>
       </div>
       <div class="field">
         <label class="label">Địa chỉ nhận hàng *</label>
-        <textarea class="textarea" name="shipping_address" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành..." required></textarea>
+        <textarea class="textarea" name="shipping_address" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành..." required>{{ checkout_profile.shipping_address }}</textarea>
       </div>
       {% if is_guest %}
       <div class="field">
         <label class="label">Email *</label>
-        <input class="input" type="email" name="guest_email" placeholder="email@domain.com" required>
+        <input class="input" type="email" name="guest_email" placeholder="email@domain.com" value="{{ checkout_profile.guest_email }}" required>
         <div style="color:var(--text-muted);font-size:0.8rem;margin-top:0.35rem">
           Dùng để nhận thông tin đơn hàng. Bạn có thể tạo mật khẩu sau.
         </div>
@@ -158,4 +175,3 @@
   </div>
 </div>
 {% endblock %}
-

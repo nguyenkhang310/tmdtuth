@@ -47,6 +47,25 @@
     box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
 
+.sidebar-mobile-head,
+.mobile-filter-trigger,
+.products-filter-overlay {
+    display: none;
+}
+
+.sidebar-close-btn {
+    border: 1.5px solid var(--border);
+    background: #fff;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text);
+}
+
 .filter-title {
     font-weight: 700;
     font-size: 0.78rem;
@@ -171,7 +190,14 @@
 .toolbar-info { display: flex; flex-direction: column; gap: 2px; }
 .toolbar-count { font-size: 0.875rem; color: var(--text-muted); }
 .toolbar-count strong { color: var(--text); }
-.toolbar-sub-label { font-size: 0.78rem; color: var(--primary); font-weight: 600; }
+.toolbar-sub-label {
+    font-size: 0.78rem;
+    color: var(--primary);
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
 
 .toolbar-right { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
 
@@ -277,12 +303,135 @@
 .page-btn.active, .page-btn:hover { background: var(--primary); border-color: var(--primary); color: white; }
 
 @media (max-width: 1024px) {
-    .products-page { grid-template-columns: 1fr; }
-    .sidebar { position: static; display: none; }
+    .products-page { grid-template-columns: 1fr; padding: 1.75rem 1.25rem 2rem; }
+    .breadcrumb { padding: 1.1rem 1.25rem 0; flex-wrap: wrap; }
+    .sidebar {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: min(86vw, 360px);
+        display: flex;
+        background: #f8fafc;
+        z-index: 1700;
+        padding: 1rem;
+        overflow-y: auto;
+        box-shadow: -16px 0 40px rgba(15, 23, 42, 0.16);
+        transform: translateX(105%);
+        opacity: 0;
+        pointer-events: none;
+        transition: transform 0.25s ease, opacity 0.25s ease;
+    }
+    body.products-filter-open .sidebar {
+        transform: translateX(0);
+        opacity: 1;
+        pointer-events: auto;
+    }
+    .sidebar-mobile-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+    .sidebar-mobile-head strong {
+        display: block;
+        font-size: 1rem;
+        color: var(--text);
+        margin-bottom: 0.2rem;
+    }
+    .sidebar-mobile-head span {
+        font-size: 0.82rem;
+        color: var(--text-muted);
+    }
+    .products-filter-overlay {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.44);
+        z-index: 1650;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.22s ease;
+    }
+    body.products-filter-open .products-filter-overlay {
+        opacity: 1;
+        pointer-events: auto;
+    }
+    .mobile-filter-trigger {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+        min-height: 42px;
+        padding: 0.65rem 0.9rem;
+        border-radius: 10px;
+        border: 1.5px solid var(--border);
+        background: #fff;
+        color: var(--text);
+        font-weight: 700;
+        font-family: inherit;
+        cursor: pointer;
+    }
+    .filter-card {
+        box-shadow: none;
+        border: 1px solid var(--border);
+    }
     .product-grid { grid-template-columns: repeat(2, 1fr); }
 }
-@media (max-width: 480px) {
-    .product-grid { grid-template-columns: 1fr; }
+@media (max-width: 640px) {
+    .products-page { padding: 1.25rem 1rem 1.75rem; gap: 1rem; }
+    .breadcrumb { padding: 0.95rem 1rem 0; font-size: 0.8rem; }
+    .toolbar { padding: 0.85rem 0.95rem; margin-bottom: 1rem; }
+    .toolbar-right {
+        width: 100%;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+    .sort-select { width: 100%; }
+    .sort-select { min-height: 42px; }
+    .product-grid { gap: 0.85rem; }
+    .product-info { padding: 0.8rem 0.8rem 0.9rem; }
+    .product-name { font-size: 0.85rem; }
+    .price-new { font-size: 0.92rem; }
+    .price-old { font-size: 0.74rem; }
+    .pagination { flex-wrap: wrap; }
+    .sidebar {
+        width: min(90vw, 360px);
+        padding: 0.9rem;
+    }
+}
+@media (max-width: 420px) {
+    .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .toolbar-count { font-size: 0.82rem; }
+    .toolbar-right {
+        gap: 0.55rem;
+    }
+    .mobile-filter-trigger,
+    .sort-select {
+        font-size: 0.82rem;
+        padding-left: 0.7rem;
+        padding-right: 0.7rem;
+    }
+    .product-badge {
+        top: 0.55rem;
+        left: 0.55rem;
+        font-size: 0.56rem;
+        padding: 0.22rem 0.48rem;
+    }
+    .product-info {
+        padding: 0.7rem 0.7rem 0.85rem;
+    }
+    .product-name {
+        font-size: 0.8rem;
+        margin-bottom: 0.4rem;
+    }
+    .price-new {
+        font-size: 0.88rem;
+    }
+    .price-old {
+        font-size: 0.7rem;
+    }
 }
 </style>
 {% endblock %}
@@ -302,7 +451,10 @@
         <span class="current">Tất cả {{ request.args.get('category') }}</span>
         {% endif %}
     {% elif request.args.get('sale') %}
-        <span class="current">🔥 Sale</span>
+        <span class="current" style="display:inline-flex;align-items:center;gap:0.3rem;">
+            <span class="material-symbols-outlined" style="font-size:1rem;color:var(--red)">local_offer</span>
+            Sale
+        </span>
     {% elif request.args.get('q') %}
         <span class="current">Kết quả: "{{ request.args.get('q') }}"</span>
     {% else %}
@@ -314,6 +466,15 @@
 <div class="products-page">
     <!-- SIDEBAR -->
     <aside class="sidebar">
+        <div class="sidebar-mobile-head">
+            <div>
+                <strong>Bộ lọc sản phẩm</strong>
+                <span>Danh mục, sắp xếp và khoảng giá</span>
+            </div>
+            <button type="button" class="sidebar-close-btn" id="close-products-filter" aria-label="Đóng bộ lọc">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
         <!-- DANH MỤC -->
         <div class="filter-card">
             <h3 class="filter-title">Danh mục</h3>
@@ -384,8 +545,9 @@
                 </li>
 
                 <li>
-                    <a href="{{ url_for('products', sale='true') }}" {% if request.args.get('sale') %}class="active"{% endif %} style="color: var(--red)">
-                        🔥 Sale
+                    <a href="{{ url_for('products', sale='true') }}" {% if request.args.get('sale') %}class="active"{% endif %} style="color: var(--red);display:inline-flex;align-items:center;gap:0.35rem;">
+                        <span class="material-symbols-outlined" style="font-size:1rem">local_offer</span>
+                        Sale
                     </a>
                 </li>
             </ul>
@@ -399,10 +561,10 @@
                     <span class="material-symbols-outlined" style="font-size:1rem">schedule</span> Mới nhất
                 </a></li>
                 <li><a href="javascript:void(0)" onclick="applySort('price_asc')" class="{% if request.args.get('sort') == 'price_asc' %}active{% endif %}">
-                    <span class="material-symbols-outlined" style="font-size:1rem">trending_up</span> Giá thấp → cao
+                    <span class="material-symbols-outlined" style="font-size:1rem">trending_up</span> Giá tăng dần
                 </a></li>
                 <li><a href="javascript:void(0)" onclick="applySort('price_desc')" class="{% if request.args.get('sort') == 'price_desc' %}active{% endif %}">
-                    <span class="material-symbols-outlined" style="font-size:1rem">trending_down</span> Giá cao → thấp
+                    <span class="material-symbols-outlined" style="font-size:1rem">trending_down</span> Giá giảm dần
                 </a></li>
             </ul>
         </div>
@@ -424,11 +586,15 @@
                     <span class="material-symbols-outlined" style="font-size:1rem">filter_alt</span> Áp dụng
                 </button>
                 {% if request.args.get('min_price') or request.args.get('max_price') %}
-                <a href="{{ url_for('products', category=request.args.get('category',''), sub=request.args.get('sub',''), sale=request.args.get('sale',''), q=request.args.get('q',''), sort=request.args.get('sort','newest')) }}" style="text-align:center;font-size:0.8rem;color:var(--text-muted);text-decoration:none;">✕ Xóa lọc giá</a>
+                <a href="{{ url_for('products', category=request.args.get('category',''), sub=request.args.get('sub',''), sale=request.args.get('sale',''), q=request.args.get('q',''), sort=request.args.get('sort','newest')) }}" style="text-align:center;font-size:0.8rem;color:var(--text-muted);text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:0.25rem;">
+                    <span class="material-symbols-outlined" style="font-size:1rem">close</span>
+                    Xóa lọc giá
+                </a>
                 {% endif %}
             </form>
         </div>
     </aside>
+    <div class="products-filter-overlay" id="products-filter-overlay"></div>
 
     <!-- PRODUCTS -->
     <main class="products-main">
@@ -437,12 +603,16 @@
         <div class="filter-chips">
             {% if request.args.get('q') %}
             <a class="filter-chip" href="{{ url_for('products', category=request.args.get('category',''), sub=request.args.get('sub',''), sale=request.args.get('sale',''), sort=request.args.get('sort','newest')) }}">
-                🔍 "{{ request.args.get('q') }}" ✕
+                <span class="material-symbols-outlined" style="font-size:0.95rem">search</span>
+                "{{ request.args.get('q') }}"
+                <span class="material-symbols-outlined" style="font-size:0.95rem">close</span>
             </a>
             {% endif %}
             {% if request.args.get('sub') %}
             <a class="filter-chip" href="{{ url_for('products', category=request.args.get('category',''), sale=request.args.get('sale',''), q=request.args.get('q',''), sort=request.args.get('sort','newest')) }}">
-                {{ request.args.get('sub') }} ✕
+                <span class="material-symbols-outlined" style="font-size:0.95rem">tune</span>
+                {{ request.args.get('sub') }}
+                <span class="material-symbols-outlined" style="font-size:0.95rem">close</span>
             </a>
             {% endif %}
             {% if request.args.get('min_price') %}
@@ -461,10 +631,17 @@
                     {% if request.args.get('category') %} trong <strong>{{ request.args.get('category') }}</strong>{% endif %}
                 </p>
                 {% if request.args.get('sub') %}
-                <span class="toolbar-sub-label">↳ Lọc theo: {{ request.args.get('category') }} {{ request.args.get('sub') }}</span>
+                <span class="toolbar-sub-label">
+                    <span class="material-symbols-outlined" style="font-size:0.95rem">subdirectory_arrow_right</span>
+                    Lọc theo: {{ request.args.get('category') }} {{ request.args.get('sub') }}
+                </span>
                 {% endif %}
             </div>
             <div class="toolbar-right">
+                <button type="button" class="mobile-filter-trigger" id="open-products-filter">
+                    <span class="material-symbols-outlined" style="font-size:1rem">tune</span>
+                    Bộ lọc
+                </button>
                 <select class="sort-select" onchange="applySort(this.value)" id="sort-select">
                     <option value="newest" {% if request.args.get('sort','newest')=='newest' %}selected{% endif %}>Mới nhất</option>
                     <option value="price_asc" {% if request.args.get('sort')=='price_asc' %}selected{% endif %}>Giá tăng dần</option>
@@ -542,6 +719,36 @@ function applySort(val) {
     url.searchParams.set('sort', val);
     window.location.href = url.toString();
 }
+
+const openProductsFilterBtn = document.getElementById('open-products-filter');
+const closeProductsFilterBtn = document.getElementById('close-products-filter');
+const productsFilterOverlay = document.getElementById('products-filter-overlay');
+
+function openProductsFilter() {
+    document.body.classList.add('products-filter-open');
+}
+
+function closeProductsFilter() {
+    document.body.classList.remove('products-filter-open');
+}
+
+if (openProductsFilterBtn) {
+    openProductsFilterBtn.addEventListener('click', openProductsFilter);
+}
+
+if (closeProductsFilterBtn) {
+    closeProductsFilterBtn.addEventListener('click', closeProductsFilter);
+}
+
+if (productsFilterOverlay) {
+    productsFilterOverlay.addEventListener('click', closeProductsFilter);
+}
+
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeProductsFilter();
+    }
+});
 
 // Accordion sidebar categories - click to toggle without blocking navigation
 document.querySelectorAll('.cat-list > li > a').forEach(link => {

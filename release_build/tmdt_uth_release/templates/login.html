@@ -1,0 +1,813 @@
+{% extends 'base.html' %}
+{% block title %}Đăng nhập - UTH Store{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .auth-page-wrapper {
+        min-height: calc(100vh - 72px);
+        background: linear-gradient(135deg, #f0f4f0 0%, #e8f0e8 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+    }
+
+    .auth-card-modern {
+        display: flex;
+        width: 100%;
+        max-width: 1020px;
+        background: white;
+        border-radius: 24px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+        overflow: hidden;
+        min-height: 620px;
+    }
+
+    /* ── Promo Panel (Left) ── */
+    .auth-promo {
+        flex: 1.1;
+        position: relative;
+        display: none;
+        background: var(--primary);
+        overflow: hidden;
+    }
+    @media(min-width: 768px) { .auth-promo { display: block; } }
+
+    .auth-promo img {
+        width: 100%; height: 100%;
+        object-fit: cover;
+        transition: transform 6s ease;
+    }
+    .auth-promo:hover img { transform: scale(1.04); }
+
+    .promo-overlay {
+        position: absolute;
+        bottom: 0; left: 0; right: 0;
+        background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.3) 60%, transparent 100%);
+        padding: 3rem 2.5rem 2.5rem;
+        color: white;
+    }
+    .promo-badge {
+        display: inline-flex; align-items: center; gap: 0.4rem;
+        background: rgba(255,255,255,0.2);
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(255,255,255,0.3);
+        border-radius: 50px;
+        padding: 0.3rem 1rem;
+        font-size: 0.8rem; font-weight: 600;
+        margin-bottom: 1rem; color: white;
+    }
+    .promo-overlay h2 {
+        font-size: 1.9rem; font-weight: 800;
+        margin-bottom: 0.6rem; line-height: 1.3;
+    }
+    .promo-overlay p { font-size: 0.95rem; opacity: 0.85; margin-bottom: 1.5rem; }
+    .promo-features { display: flex; flex-direction: column; gap: 0.5rem; }
+    .promo-feature {
+        display: flex; align-items: center; gap: 0.6rem;
+        font-size: 0.88rem; opacity: 0.9;
+    }
+    .promo-feature .material-symbols-outlined { font-size: 1.1rem; color: #6ee7a0; }
+
+    /* ── Auth Content (Right) ── */
+    .auth-content {
+        flex: 1;
+        padding: 3rem 2.8rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        max-width: 480px;
+        width: 100%;
+        margin: 0 auto;
+    }
+
+    .auth-logo-row {
+        display: flex; align-items: center; gap: 0.6rem;
+        margin-bottom: 1.8rem;
+    }
+    .auth-logo-row img { height: 32px; }
+    .auth-logo-row span { font-size: 0.85rem; color: var(--text-muted); }
+
+    /* ── Tabs ── */
+    .auth-tabs {
+        display: flex; gap: 0;
+        margin-bottom: 2rem;
+        background: #f3f4f6;
+        border-radius: 10px;
+        padding: 4px;
+    }
+    .auth-tab {
+        flex: 1;
+        background: none; border: none;
+        padding: 0.65rem 0;
+        font-size: 0.975rem; font-weight: 700;
+        color: var(--text-muted);
+        cursor: pointer;
+        border-radius: 8px;
+        transition: all 0.25s ease;
+        font-family: inherit;
+    }
+    .auth-tab.active {
+        background: white;
+        color: var(--primary);
+        box-shadow: 0 1px 6px rgba(0,0,0,0.1);
+    }
+
+    /* ── Forms ── */
+    .auth-form { display: none; animation: fadeSlideIn 0.3s ease; }
+    .auth-form.active { display: block; }
+
+    @keyframes fadeSlideIn {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Floating Label Inputs ── */
+    .form-group {
+        position: relative;
+        margin-bottom: 1.4rem;
+    }
+    .form-input {
+        width: 100%;
+        padding: 1.15rem 1rem 0.55rem 1rem;
+        font-size: 1rem;
+        border: 1.5px solid #e5e7eb;
+        border-radius: 10px;
+        background: #fafafa;
+        outline: none;
+        transition: all 0.2s;
+        font-family: inherit;
+        color: var(--text);
+    }
+    .form-input:focus {
+        border-color: var(--primary);
+        background: white;
+        box-shadow: 0 0 0 4px rgba(10,92,54,0.08);
+    }
+    .form-input.input-error { border-color: #ef4444 !important; }
+    .form-input.input-success { border-color: #22c55e !important; }
+
+    .form-label {
+        position: absolute;
+        top: 50%; left: 1rem;
+        transform: translateY(-50%);
+        color: #9ca3af;
+        font-size: 0.98rem;
+        pointer-events: none;
+        transition: all 0.2s ease;
+        background: transparent;
+    }
+    .form-input:focus ~ .form-label,
+    .form-input:not(:placeholder-shown) ~ .form-label {
+        top: 0.55rem;
+        font-size: 0.72rem;
+        color: var(--primary);
+        font-weight: 600;
+    }
+    .form-input::placeholder { color: transparent; }
+
+    .password-toggle {
+        position: absolute;
+        right: 0.9rem; top: 50%;
+        transform: translateY(-50%);
+        color: #9ca3af;
+        background: none; border: none;
+        cursor: pointer; padding: 0;
+        display: flex; align-items: center;
+        transition: color 0.2s;
+    }
+    .password-toggle:hover { color: var(--primary); }
+    .password-toggle .material-symbols-outlined { font-size: 1.2rem; }
+
+    /* ── Confirm Password Match Indicator ── */
+    .field-feedback {
+        font-size: 0.78rem; margin-top: 0.3rem;
+        display: flex; align-items: center; gap: 0.3rem;
+        min-height: 1.1rem;
+        padding-left: 0.2rem;
+    }
+    .field-feedback.match { color: #16a34a; }
+    .field-feedback.no-match { color: #dc2626; }
+    .field-feedback .material-symbols-outlined { font-size: 0.9rem; }
+
+    /* ── Password Strength Bar ── */
+    .strength-bar-wrap {
+        margin-top: 0.5rem;
+        margin-bottom: 0.3rem;
+    }
+    .strength-bar-track {
+        height: 4px; border-radius: 4px;
+        background: #e5e7eb;
+        overflow: hidden;
+    }
+    .strength-bar-fill {
+        height: 100%; border-radius: 4px;
+        width: 0%; transition: width 0.4s ease, background 0.4s ease;
+    }
+    .strength-label {
+        font-size: 0.75rem; margin-top: 0.3rem;
+        font-weight: 600; transition: color 0.3s;
+        padding-left: 0.1rem;
+        display: flex; align-items: center; gap: 0.3rem;
+    }
+
+    /* ── Submit Button ── */
+    .submit-btn {
+        width: 100%;
+        padding: 0.95rem;
+        background: var(--primary);
+        color: white; border: none;
+        border-radius: 10px;
+        font-size: 1rem; font-weight: 700;
+        cursor: pointer; font-family: inherit;
+        transition: all 0.2s;
+        margin-top: 0.3rem;
+        display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+        position: relative; overflow: hidden;
+    }
+    .submit-btn:hover {
+        background: var(--primary-dark);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(10,92,54,0.25);
+    }
+    .submit-btn:active { transform: translateY(0); }
+    .submit-btn.loading { pointer-events: none; opacity: 0.8; }
+    .btn-spinner {
+        display: none;
+        width: 18px; height: 18px;
+        border: 2px solid rgba(255,255,255,0.4);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+    }
+    .submit-btn.loading .btn-spinner { display: block; }
+    .submit-btn.loading .btn-text { opacity: 0.7; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Auth Helpers ── */
+    .auth-helpers {
+        display: flex; justify-content: space-between; align-items: center;
+        margin: 0.9rem 0 0.4rem; font-size: 0.88rem;
+    }
+    .helper-link {
+        color: var(--primary); text-decoration: none; font-weight: 600;
+        transition: opacity 0.2s;
+    }
+    .helper-link:hover { opacity: 0.75; text-decoration: underline; }
+
+    /* ── Divider ── */
+    .divider {
+        display: flex; align-items: center; gap: 1rem;
+        margin: 1.6rem 0; color: #9ca3af; font-size: 0.85rem;
+    }
+    .divider::before, .divider::after {
+        content: ''; flex: 1; height: 1px; background: #e5e7eb;
+    }
+
+    /* ── Social Buttons ── */
+    .social-auth { display: flex; gap: 0.8rem; }
+    .social-btn-wrap { flex: 1; position: relative; }
+    .social-btn {
+        width: 100%;
+        display: flex; align-items: center; justify-content: center; gap: 0.65rem;
+        padding: 0.75rem 0.5rem;
+        border: 1.5px solid #e5e7eb;
+        border-radius: 10px; background: white;
+        font-size: 0.9rem; font-weight: 600;
+        cursor: not-allowed;
+        transition: all 0.2s;
+        font-family: inherit;
+        color: #374151;
+        opacity: 0.8;
+    }
+    .social-btn:hover {
+        background: #f9fafb;
+        border-color: #d1d5db;
+        opacity: 1;
+    }
+    .social-btn img { width: 18px; height: 18px; }
+    .social-tooltip {
+        position: absolute; bottom: calc(100% + 8px); left: 50%;
+        transform: translateX(-50%) translateY(4px);
+        background: #1f2937; color: white;
+        font-size: 0.75rem; font-weight: 500;
+        padding: 0.35rem 0.75rem; border-radius: 6px;
+        white-space: nowrap; pointer-events: none;
+        opacity: 0; transition: all 0.2s ease;
+        z-index: 10;
+    }
+    .social-tooltip::after {
+        content: ''; position: absolute;
+        top: 100%; left: 50%; transform: translateX(-50%);
+        border: 5px solid transparent; border-top-color: #1f2937;
+    }
+    .social-btn-wrap:hover .social-tooltip {
+        opacity: 1; transform: translateX(-50%) translateY(0);
+    }
+
+    /* ── Remember me ── */
+    .remember-label {
+        display: flex; align-items: center; gap: 0.4rem;
+        cursor: pointer; font-size: 0.88rem; color: #374151;
+    }
+    .remember-label input[type="checkbox"] {
+        width: 15px; height: 15px;
+        accent-color: var(--primary); cursor: pointer;
+        border-radius: 4px;
+    }
+
+    /* ── Terms text ── */
+    .terms-text {
+        text-align: center; font-size: 0.8rem;
+        color: var(--text-muted); margin-top: 1.2rem;
+        line-height: 1.5;
+    }
+    .terms-text a { color: var(--primary); font-weight: 600; }
+    .terms-checkbox {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.65rem;
+        background: #f8fafc;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 0.85rem 0.95rem;
+        margin-top: 0.2rem;
+    }
+    .terms-checkbox input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        margin-top: 0.15rem;
+        accent-color: var(--primary);
+        flex-shrink: 0;
+    }
+    .terms-checkbox label {
+        font-size: 0.84rem;
+        color: var(--text-muted);
+        line-height: 1.55;
+        cursor: pointer;
+    }
+    .terms-checkbox a { color: var(--primary); font-weight: 700; }
+
+    /* ── Forgot PW Modal ── */
+    .modal-overlay {
+        position: fixed; inset: 0;
+        background: rgba(0,0,0,0.5);
+        backdrop-filter: blur(4px);
+        z-index: 9000;
+        display: none; align-items: center; justify-content: center;
+        animation: fadeIn 0.2s ease;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+        background: white; border-radius: 20px;
+        padding: 2.5rem; width: 100%; max-width: 440px;
+        box-shadow: 0 25px 60px rgba(0,0,0,0.2);
+        position: relative;
+        animation: slideUp 0.3s ease;
+    }
+    @keyframes slideUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .modal-close {
+        position: absolute; top: 1.2rem; right: 1.2rem;
+        background: #f3f4f6; border: none; border-radius: 8px;
+        width: 32px; height: 32px;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; color: #6b7280; transition: all 0.2s;
+    }
+    .modal-close:hover { background: #e5e7eb; color: #111; }
+    .modal-icon {
+        width: 60px; height: 60px; border-radius: 50%;
+        background: #ecfdf5; margin: 0 auto 1.2rem;
+        display: flex; align-items: center; justify-content: center;
+    }
+    .modal-icon .material-symbols-outlined { font-size: 2rem; color: var(--primary); }
+    .modal-title {
+        text-align: center; font-size: 1.3rem; font-weight: 800;
+        margin-bottom: 0.4rem; color: #111;
+    }
+    .modal-desc {
+        text-align: center; font-size: 0.88rem; color: #6b7280;
+        margin-bottom: 1.8rem; line-height: 1.6;
+    }
+    .reset-link-box {
+        background: #f0fdf4; border: 1.5px solid #bbf7d0;
+        border-radius: 10px; padding: 1rem 1.2rem;
+        margin: 1rem 0;
+    }
+    .reset-link-box p {
+        font-size: 0.82rem; color: #166534; font-weight: 600; margin-bottom: 0.5rem;
+    }
+    .reset-link-box a {
+        font-size: 0.88rem; color: var(--primary);
+        word-break: break-all; font-weight: 700;
+        display: flex; align-items: flex-start; gap: 0.4rem;
+        text-decoration: none;
+    }
+    .reset-link-box a:hover { text-decoration: underline; }
+    .reset-link-box .material-symbols-outlined { font-size: 1rem; margin-top: 2px; flex-shrink: 0; }
+    .security-note {
+        background: #fffbeb; border: 1px solid #fde68a;
+        border-radius: 8px; padding: 0.6rem 0.9rem;
+        font-size: 0.78rem; color: #92400e;
+        display: flex; align-items: flex-start; gap: 0.4rem;
+        margin-top: 0.8rem; line-height: 1.5;
+    }
+    .security-note .material-symbols-outlined { font-size: 0.95rem; margin-top: 1px; flex-shrink: 0; }
+
+    @media(max-width: 767px) {
+        .auth-page-wrapper { padding: 1rem; }
+        .auth-card-modern {
+            min-height: auto;
+            border-radius: 18px;
+        }
+        .auth-content { padding: 2rem 1.5rem; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="auth-page-wrapper">
+    <div class="auth-card-modern">
+        <!-- Banner Trái -->
+        <div class="auth-promo">
+            <img src="{{ url_for('static', filename='images/login_promo_banner.png') }}" alt="Shopping Banner">
+            <div class="promo-overlay">
+                <div class="promo-badge">
+                    <span class="material-symbols-outlined" style="font-size:0.9rem;">verified</span>
+                    UTH Store — Thương hiệu uy tín
+                </div>
+                <h2>Mua sắm thả ga,<br>ưu đãi không ngừng</h2>
+                <p>Khám phá bộ sưu tập thời trang cao cấp với hàng nghìn ưu đãi hấp dẫn mỗi ngày.</p>
+                <div class="promo-features">
+                    <div class="promo-feature">
+                        <span class="material-symbols-outlined">local_shipping</span>
+                        Miễn phí vận chuyển đơn từ 500.000đ
+                    </div>
+                    <div class="promo-feature">
+                        <span class="material-symbols-outlined">currency_exchange</span>
+                        Đổi trả dễ dàng trong 30 ngày
+                    </div>
+                    <div class="promo-feature">
+                        <span class="material-symbols-outlined">security</span>
+                        Thanh toán an toàn & bảo mật
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Form Đăng nhập & Đăng ký -->
+        <div class="auth-content">
+            <div class="auth-logo-row">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="UTH Store Logo">
+                <span>| Chào mừng trở lại 👋</span>
+            </div>
+
+            <div class="auth-tabs">
+                <button class="auth-tab active" id="tab-login" onclick="switchTab('login')">Đăng nhập</button>
+                <button class="auth-tab" id="tab-register" onclick="switchTab('register')">Đăng ký</button>
+            </div>
+
+            <!-- ═══ FORM ĐĂNG NHẬP ═══ -->
+            <form class="auth-form active" id="form-login" action="{{ url_for('login') }}" method="POST" onsubmit="handleSubmit(this)">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div class="form-group">
+                    <input type="text" name="login_id" id="login_id" class="form-input" placeholder=" " required autocomplete="username">
+                    <label for="login_id" class="form-label">Tên đăng nhập hoặc Email</label>
+                </div>
+
+                <div class="form-group">
+                    <input type="password" name="password" id="login_pw" class="form-input" placeholder=" " required autocomplete="current-password">
+                    <label for="login_pw" class="form-label">Mật khẩu</label>
+                    <button type="button" class="password-toggle" onclick="togglePassword('login_pw', this)">
+                        <span class="material-symbols-outlined">visibility_off</span>
+                    </button>
+                </div>
+
+                <div class="auth-helpers">
+                    <label class="remember-label">
+                        <input type="checkbox" name="remember"> Nhớ đăng nhập
+                    </label>
+                    <a href="#" class="helper-link" onclick="openForgotModal(event)">Quên mật khẩu?</a>
+                </div>
+
+                <button type="submit" class="submit-btn" id="btn-login">
+                    <div class="btn-spinner"></div>
+                    <span class="btn-text">Đăng nhập</span>
+                </button>
+
+                <div class="divider">Hoặc tiếp tục bằng</div>
+                <div class="social-auth">
+                    <div class="social-btn-wrap">
+                        <button type="button" class="social-btn">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="Google">
+                            Google
+                        </button>
+                        <div class="social-tooltip">Sắp ra mắt</div>
+                    </div>
+                    <div class="social-btn-wrap">
+                        <button type="button" class="social-btn">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/b/b8/2021_Facebook_icon.svg" alt="Facebook">
+                            Facebook
+                        </button>
+                        <div class="social-tooltip">Sắp ra mắt</div>
+                    </div>
+                </div>
+            </form>
+
+            <!-- ═══ FORM ĐĂNG KÝ ═══ -->
+            <form class="auth-form" id="form-register" action="{{ url_for('register') }}" method="POST" onsubmit="return validateAndSubmitRegister(this)">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div class="form-group">
+                    <input type="text" name="last_name" id="reg_last_name" class="form-input" placeholder=" " required autocomplete="family-name">
+                    <label for="reg_last_name" class="form-label">Họ và tên đệm</label>
+                </div>
+
+                <div class="form-group">
+                    <input type="text" name="first_name" id="reg_first_name" class="form-input" placeholder=" " required autocomplete="given-name">
+                    <label for="reg_first_name" class="form-label">Tên</label>
+                </div>
+
+                <div class="form-group">
+                    <input type="text" name="username" id="reg_username" class="form-input" placeholder=" " required autocomplete="username">
+                    <label for="reg_username" class="form-label">Tên đăng nhập</label>
+                </div>
+
+                <div class="form-group">
+                    <input type="email" name="email" id="reg_email" class="form-input" placeholder=" " required autocomplete="email">
+                    <label for="reg_email" class="form-label">Địa chỉ Email</label>
+                </div>
+
+                <div class="form-group">
+                    <input type="password" name="password" id="reg_pw" class="form-input" placeholder=" " required minlength="8" oninput="checkStrength(this.value); checkConfirm()">
+                    <label for="reg_pw" class="form-label">Mật khẩu</label>
+                    <button type="button" class="password-toggle" onclick="togglePassword('reg_pw', this)">
+                        <span class="material-symbols-outlined">visibility_off</span>
+                    </button>
+                </div>
+
+                <!-- Strength Bar -->
+                <div class="strength-bar-wrap" id="strength-wrap" style="display:none;">
+                    <div class="strength-bar-track">
+                        <div class="strength-bar-fill" id="strength-fill"></div>
+                    </div>
+                    <div class="strength-label" id="strength-label"></div>
+                </div>
+
+                <div class="form-group" style="margin-top: 0.8rem;">
+                    <input type="password" name="confirm_password" id="reg_confirm_pw" class="form-input" placeholder=" " required oninput="checkConfirm()">
+                    <label for="reg_confirm_pw" class="form-label">Xác nhận mật khẩu</label>
+                    <button type="button" class="password-toggle" onclick="togglePassword('reg_confirm_pw', this)">
+                        <span class="material-symbols-outlined">visibility_off</span>
+                    </button>
+                </div>
+                <div class="field-feedback" id="confirm-feedback"></div>
+
+                <div class="terms-checkbox">
+                    <input type="checkbox" name="agree_policy" id="agree_policy" value="yes" required>
+                    <label for="agree_policy">
+                        Tôi đã đọc và đồng ý với
+                        <a href="{{ url_for('policy') }}" target="_blank" rel="noopener">Điều khoản dịch vụ</a>
+                        và
+                        <a href="{{ url_for('policy') }}" target="_blank" rel="noopener">Chính sách bảo mật</a>
+                        của UTH Store.
+                    </label>
+                </div>
+
+                <button type="submit" class="submit-btn" id="btn-register" style="margin-top: 1rem;">
+                    <div class="btn-spinner"></div>
+                    <span class="btn-text">Tạo tài khoản</span>
+                </button>
+
+                <p class="terms-text">
+                    Thông tin đăng ký sẽ được dùng để tạo hồ sơ mua hàng và tự động điền ở bước thanh toán.
+                </p>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ MODAL QUÊN MẬT KHẨU ═══ -->
+<div class="modal-overlay" id="forgotModal" onclick="closeForgotModal(event)">
+    <div class="modal-box">
+        <button class="modal-close" type="button" onclick="closeForgotModalDirect()">
+            <span class="material-symbols-outlined" style="font-size:1rem;">close</span>
+        </button>
+
+        <div class="modal-icon">
+            <span class="material-symbols-outlined">lock_reset</span>
+        </div>
+        <h2 class="modal-title">Quên mật khẩu?</h2>
+        <p class="modal-desc">Nhập email đăng ký của bạn. Chúng tôi sẽ tạo liên kết đặt lại mật khẩu ngay lập tức.</p>
+
+        <form action="{{ url_for('forgot_password') }}" method="GET" onsubmit="submitForgotForm(event)">
+            <div class="form-group" style="margin-bottom:1rem;">
+                <input type="email" id="forgot_email" name="email_preview" class="form-input" placeholder=" " required>
+                <label for="forgot_email" class="form-label">Địa chỉ Email</label>
+            </div>
+            <button type="submit" class="submit-btn" id="btn-forgot">
+                <div class="btn-spinner"></div>
+                <span class="btn-text">Lấy liên kết đặt lại</span>
+            </button>
+        </form>
+
+        <div class="security-note">
+            <span class="material-symbols-outlined">info</span>
+            <span>Liên kết đặt lại có hiệu lực trong <strong>30 phút</strong> và chỉ sử dụng được <strong>một lần</strong>.</span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// ── Tab switching ──
+function switchTab(tab) {
+    document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+    document.getElementById('form-' + tab).classList.add('active');
+}
+
+// ── Password toggle ──
+function togglePassword(inputId, btn) {
+    const input = document.getElementById(inputId);
+    const icon = btn.querySelector('.material-symbols-outlined');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.textContent = 'visibility';
+    } else {
+        input.type = 'password';
+        icon.textContent = 'visibility_off';
+    }
+}
+
+// ── Password strength ──
+function checkStrength(pw) {
+    const wrap = document.getElementById('strength-wrap');
+    const fill = document.getElementById('strength-fill');
+    const label = document.getElementById('strength-label');
+
+    if (!pw) { wrap.style.display = 'none'; return; }
+    wrap.style.display = 'block';
+
+    let score = 0;
+    if (pw.length >= 8)  score++;
+    if (pw.length >= 12) score++;
+    if (/[A-Z]/.test(pw)) score++;
+    if (/[0-9]/.test(pw)) score++;
+    if (/[^a-zA-Z0-9]/.test(pw)) score++;
+
+    const levels = [
+        { pct: '20%',  color: '#ef4444', text: 'Rất yếu', icon: 'report' },
+        { pct: '40%',  color: '#f97316', text: 'Yếu', icon: 'warning' },
+        { pct: '60%',  color: '#eab308', text: 'Trung bình', icon: 'shield' },
+        { pct: '80%',  color: '#22c55e', text: 'Mạnh', icon: 'verified' },
+        { pct: '100%', color: '#16a34a', text: 'Rất mạnh', icon: 'verified_user' },
+    ];
+    const lvl = levels[Math.min(score, 4)];
+    fill.style.width = lvl.pct;
+    fill.style.background = lvl.color;
+    label.innerHTML = `<span class="material-symbols-outlined" style="font-size:0.95rem">${lvl.icon}</span>${lvl.text}`;
+    label.style.color = lvl.color;
+}
+
+// ── Confirm password match ──
+function checkConfirm() {
+    const pw = document.getElementById('reg_pw').value;
+    const confirm = document.getElementById('reg_confirm_pw').value;
+    const feedback = document.getElementById('confirm-feedback');
+    const confirmInput = document.getElementById('reg_confirm_pw');
+
+    if (!confirm) {
+        feedback.innerHTML = '';
+        confirmInput.classList.remove('input-error', 'input-success');
+        return;
+    }
+    if (pw === confirm) {
+        feedback.className = 'field-feedback match';
+        feedback.innerHTML = '<span class="material-symbols-outlined">check_circle</span> Mật khẩu khớp';
+        confirmInput.classList.remove('input-error');
+        confirmInput.classList.add('input-success');
+    } else {
+        feedback.className = 'field-feedback no-match';
+        feedback.innerHTML = '<span class="material-symbols-outlined">cancel</span> Mật khẩu chưa khớp';
+        confirmInput.classList.remove('input-success');
+        confirmInput.classList.add('input-error');
+    }
+}
+
+// ── Submit with spinner ──
+function handleSubmit(form) {
+    const btn = form.querySelector('.submit-btn');
+    if (btn) btn.classList.add('loading');
+}
+
+// ── Register validation ──
+function validateAndSubmitRegister(form) {
+    const firstName = document.getElementById('reg_first_name').value.trim();
+    const lastName = document.getElementById('reg_last_name').value.trim();
+    const username = document.getElementById('reg_username').value.trim();
+    const pw = document.getElementById('reg_pw').value;
+    const confirm = document.getElementById('reg_confirm_pw').value;
+    const agreedPolicy = document.getElementById('agree_policy').checked;
+    const regex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}$/;
+    const usernameRegex = /^[A-Za-z0-9_.-]{4,30}$/;
+
+    if (!lastName || !firstName || !username) {
+        showInlineError('form-register', 'Vui lòng nhập đầy đủ Họ, Tên và Tên đăng nhập.');
+        return false;
+    }
+    if (!usernameRegex.test(username)) {
+        showInlineError('form-register', 'Tên đăng nhập dài 4-30 ký tự và chỉ gồm chữ cái, số, dấu chấm, gạch dưới hoặc gạch ngang.');
+        return false;
+    }
+
+    if (!regex.test(pw)) {
+        // Dùng flash thay alert
+        showInlineError('form-register', 'Mật khẩu phải có ít nhất 8 ký tự, bao gồm chữ HOA, thường và số.');
+        return false;
+    }
+    if (pw !== confirm) {
+        showInlineError('form-register', 'Xác nhận mật khẩu không khớp.');
+        return false;
+    }
+    if (!agreedPolicy) {
+        showInlineError('form-register', 'Bạn cần đồng ý với điều khoản và chính sách trước khi đăng ký.');
+        return false;
+    }
+    handleSubmit(form);
+    return true;
+}
+
+function showInlineError(formId, msg) {
+    const form = document.getElementById(formId);
+    let err = form.querySelector('.inline-error');
+    if (!err) {
+        err = document.createElement('div');
+        err.className = 'inline-error';
+        err.style.cssText = 'background:#fef2f2;border:1px solid #fecaca;color:#dc2626;border-radius:8px;padding:0.6rem 1rem;font-size:0.88rem;margin-bottom:1rem;display:flex;align-items:center;gap:0.4rem;';
+        form.insertBefore(err, form.firstElementChild.nextElementSibling);
+    }
+    err.innerHTML = '<span class="material-symbols-outlined" style="font-size:1rem;">error</span>' + msg;
+    err.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ── Forgot password modal ──
+function openForgotModal(e) {
+    if (e) e.preventDefault();
+    document.getElementById('forgotModal').classList.add('open');
+    setTimeout(() => document.getElementById('forgot_email').focus(), 300);
+}
+function closeForgotModal(e) {
+    if (e.target === document.getElementById('forgotModal')) {
+        closeForgotModalDirect();
+    }
+}
+function closeForgotModalDirect() {
+    document.getElementById('forgotModal').classList.remove('open');
+}
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeForgotModalDirect();
+});
+
+function submitForgotForm(e) {
+    e.preventDefault();
+    const email = document.getElementById('forgot_email').value.trim();
+    if (!email) return;
+
+    const btn = document.getElementById('btn-forgot');
+    btn.classList.add('loading');
+
+    // Redirect tới trang forgot-password với email được điền sẵn qua POST form ảo
+    const realForm = document.createElement('form');
+    realForm.method = 'POST';
+    realForm.action = '/forgot-password';
+    realForm.style.display = 'none';
+
+    const csrfInput = document.createElement('input');
+    csrfInput.name = 'csrf_token';
+    csrfInput.value = document.querySelector('input[name=csrf_token]').value;
+
+    const emailInput = document.createElement('input');
+    emailInput.name = 'email';
+    emailInput.value = email;
+
+    realForm.appendChild(csrfInput);
+    realForm.appendChild(emailInput);
+    document.body.appendChild(realForm);
+    realForm.submit();
+}
+
+// ── Auto switch tab từ URL hash hoặc flash message ──
+if (window.location.hash === '#register') switchTab('register');
+
+// Nếu có flash error liên quan đến đăng ký thì tự động mở tab đăng ký
+{% if get_flashed_messages() and request.referrer and 'register' in (request.referrer or '') %}
+switchTab('register');
+{% endif %}
+</script>
+{% endblock %}

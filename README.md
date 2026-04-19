@@ -403,6 +403,35 @@ venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+### Bước 3.1: Cấu hình biến môi trường quan trọng (`.env`)
+Tạo file `.env` ở thư mục gốc dự án để cấu hình khóa bí mật, rate limit, cổng thanh toán và email reset mật khẩu.
+
+Ví dụ tối thiểu cho môi trường phát triển:
+```env
+SECRET_KEY=abcdefghijklmnopqrstuvwxyz123456
+TESTING=0
+FLASK_DEBUG=1
+LIMITER_STORAGE_URI=memory://
+
+# Email reset password (SMTP)
+MAIL_SERVER=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USE_TLS=1
+MAIL_USE_SSL=0
+MAIL_USERNAME=your_email@gmail.com
+MAIL_PASSWORD=your_app_password
+MAIL_DEFAULT_SENDER="UTH Store <your_email@gmail.com>"
+
+# Cho phép log nội dung email ra terminal khi chưa cấu hình SMTP đầy đủ
+MAIL_CONSOLE_FALLBACK=1
+PASSWORD_RESET_EXPIRES_MINUTES=30
+```
+
+Ghi chú:
+- Với Gmail, nên dùng `App Password` thay vì mật khẩu đăng nhập thông thường.
+- Trong môi trường demo cục bộ, nếu chưa cấu hình SMTP, hệ thống sẽ ghi email reset password vào terminal/server log khi `MAIL_CONSOLE_FALLBACK=1`.
+- Trong môi trường triển khai thật, nên tắt `MAIL_CONSOLE_FALLBACK` và cấu hình SMTP đầy đủ.
+
 ### Bước 4: Khởi tạo Dữ liệu mẫu (Database Seeding)
 Chỉ cần chạy lệnh này trong **lần đầu tiên** để hệ thống tự động tạo File Database ảo (`ecommerce.db`) và nhồi toàn bộ sản phẩm, danh mục, cấu hình hệ thống mẫu vào.
 ```bash
@@ -414,6 +443,17 @@ python seed.py
 python app.py
 ```
 Sau khi thấy dòng chữ `Running on http://127.0.0.1:5011`, hãy mở trình duyệt và truy cập vào đường link: **http://127.0.0.1:5011**
+
+### Bước 5.1: Dùng MoMo/VNPAY khi chia sẻ project qua file ZIP
+
+Project sử dụng biến `PUBLIC_URL` để nhận callback/IPN từ MoMo và VNPAY. Khi một thành viên trong nhóm tự chạy project trên máy của họ, người đó cần có một URL public riêng bằng `ngrok`, sau đó cập nhật lại `PUBLIC_URL` trong `.env`.
+
+Để giảm thao tác cho người nhận file zip, project đã có sẵn các file hỗ trợ ở thư mục gốc:
+
+- Windows: `1_start_app_windows.bat`, `2_start_ngrok_windows.bat`, `3_cap_nhat_public_url_windows.bat`
+- macOS: `1_start_app_mac.command`, `2_start_ngrok_mac.command`, `3_cap_nhat_public_url_mac.command`
+
+Hướng dẫn chi tiết từng bước cho cả Windows và macOS nằm trong file [HUONG_DAN_MOMO_VNPAY_NGROK.md](./HUONG_DAN_MOMO_VNPAY_NGROK.md).
 
 ---
 

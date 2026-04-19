@@ -208,6 +208,7 @@
         font-size: 0.75rem; margin-top: 0.3rem;
         font-weight: 600; transition: color 0.3s;
         padding-left: 0.1rem;
+        display: flex; align-items: center; gap: 0.3rem;
     }
 
     /* ── Submit Button ── */
@@ -322,6 +323,30 @@
         line-height: 1.5;
     }
     .terms-text a { color: var(--primary); font-weight: 600; }
+    .terms-checkbox {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.65rem;
+        background: #f8fafc;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 0.85rem 0.95rem;
+        margin-top: 0.2rem;
+    }
+    .terms-checkbox input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        margin-top: 0.15rem;
+        accent-color: var(--primary);
+        flex-shrink: 0;
+    }
+    .terms-checkbox label {
+        font-size: 0.84rem;
+        color: var(--text-muted);
+        line-height: 1.55;
+        cursor: pointer;
+    }
+    .terms-checkbox a { color: var(--primary); font-weight: 700; }
 
     /* ── Forgot PW Modal ── */
     .modal-overlay {
@@ -392,6 +417,11 @@
     .security-note .material-symbols-outlined { font-size: 0.95rem; margin-top: 1px; flex-shrink: 0; }
 
     @media(max-width: 767px) {
+        .auth-page-wrapper { padding: 1rem; }
+        .auth-card-modern {
+            min-height: auto;
+            border-radius: 18px;
+        }
         .auth-content { padding: 2rem 1.5rem; }
     }
 </style>
@@ -492,8 +522,18 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
                 <div class="form-group">
-                    <input type="text" name="name" id="reg_name" class="form-input" placeholder=" " required autocomplete="name">
-                    <label for="reg_name" class="form-label">Họ và tên</label>
+                    <input type="text" name="last_name" id="reg_last_name" class="form-input" placeholder=" " required autocomplete="family-name">
+                    <label for="reg_last_name" class="form-label">Họ và tên đệm</label>
+                </div>
+
+                <div class="form-group">
+                    <input type="text" name="first_name" id="reg_first_name" class="form-input" placeholder=" " required autocomplete="given-name">
+                    <label for="reg_first_name" class="form-label">Tên</label>
+                </div>
+
+                <div class="form-group">
+                    <input type="text" name="username" id="reg_username" class="form-input" placeholder=" " required autocomplete="username">
+                    <label for="reg_username" class="form-label">Tên đăng nhập</label>
                 </div>
 
                 <div class="form-group">
@@ -526,15 +566,24 @@
                 </div>
                 <div class="field-feedback" id="confirm-feedback"></div>
 
+                <div class="terms-checkbox">
+                    <input type="checkbox" name="agree_policy" id="agree_policy" value="yes" required>
+                    <label for="agree_policy">
+                        Tôi đã đọc và đồng ý với
+                        <a href="{{ url_for('policy') }}" target="_blank" rel="noopener">Điều khoản dịch vụ</a>
+                        và
+                        <a href="{{ url_for('policy') }}" target="_blank" rel="noopener">Chính sách bảo mật</a>
+                        của UTH Store.
+                    </label>
+                </div>
+
                 <button type="submit" class="submit-btn" id="btn-register" style="margin-top: 1rem;">
                     <div class="btn-spinner"></div>
                     <span class="btn-text">Tạo tài khoản</span>
                 </button>
 
                 <p class="terms-text">
-                    Bằng việc đăng ký, bạn đồng ý với
-                    <a href="{{ url_for('policy') }}">Điều khoản dịch vụ</a>
-                    và <a href="{{ url_for('policy') }}">Chính sách bảo mật</a> của UTH Store.
+                    Thông tin đăng ký sẽ được dùng để tạo hồ sơ mua hàng và tự động điền ở bước thanh toán.
                 </p>
             </form>
         </div>
@@ -613,16 +662,16 @@ function checkStrength(pw) {
     if (/[^a-zA-Z0-9]/.test(pw)) score++;
 
     const levels = [
-        { pct: '20%',  color: '#ef4444', text: 'Rất yếu' },
-        { pct: '40%',  color: '#f97316', text: 'Yếu' },
-        { pct: '60%',  color: '#eab308', text: 'Trung bình' },
-        { pct: '80%',  color: '#22c55e', text: 'Mạnh' },
-        { pct: '100%', color: '#16a34a', text: 'Rất mạnh 🔒' },
+        { pct: '20%',  color: '#ef4444', text: 'Rất yếu', icon: 'report' },
+        { pct: '40%',  color: '#f97316', text: 'Yếu', icon: 'warning' },
+        { pct: '60%',  color: '#eab308', text: 'Trung bình', icon: 'shield' },
+        { pct: '80%',  color: '#22c55e', text: 'Mạnh', icon: 'verified' },
+        { pct: '100%', color: '#16a34a', text: 'Rất mạnh', icon: 'verified_user' },
     ];
     const lvl = levels[Math.min(score, 4)];
     fill.style.width = lvl.pct;
     fill.style.background = lvl.color;
-    label.textContent = lvl.text;
+    label.innerHTML = `<span class="material-symbols-outlined" style="font-size:0.95rem">${lvl.icon}</span>${lvl.text}`;
     label.style.color = lvl.color;
 }
 
@@ -659,9 +708,23 @@ function handleSubmit(form) {
 
 // ── Register validation ──
 function validateAndSubmitRegister(form) {
+    const firstName = document.getElementById('reg_first_name').value.trim();
+    const lastName = document.getElementById('reg_last_name').value.trim();
+    const username = document.getElementById('reg_username').value.trim();
     const pw = document.getElementById('reg_pw').value;
     const confirm = document.getElementById('reg_confirm_pw').value;
+    const agreedPolicy = document.getElementById('agree_policy').checked;
     const regex = /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}$/;
+    const usernameRegex = /^[A-Za-z0-9_.-]{4,30}$/;
+
+    if (!lastName || !firstName || !username) {
+        showInlineError('form-register', 'Vui lòng nhập đầy đủ Họ, Tên và Tên đăng nhập.');
+        return false;
+    }
+    if (!usernameRegex.test(username)) {
+        showInlineError('form-register', 'Tên đăng nhập dài 4-30 ký tự và chỉ gồm chữ cái, số, dấu chấm, gạch dưới hoặc gạch ngang.');
+        return false;
+    }
 
     if (!regex.test(pw)) {
         // Dùng flash thay alert
@@ -670,6 +733,10 @@ function validateAndSubmitRegister(form) {
     }
     if (pw !== confirm) {
         showInlineError('form-register', 'Xác nhận mật khẩu không khớp.');
+        return false;
+    }
+    if (!agreedPolicy) {
+        showInlineError('form-register', 'Bạn cần đồng ý với điều khoản và chính sách trước khi đăng ký.');
         return false;
     }
     handleSubmit(form);

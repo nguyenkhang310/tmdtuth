@@ -4,6 +4,11 @@
 {% block extra_styles %}
 <style>
 /* ===== ADMIN LAYOUT ===== */
+.page-wrapper {
+    animation: none !important;
+    transform: none !important;
+}
+
 .admin-layout {
     display: flex;
     min-height: calc(100vh - 72px);
@@ -263,6 +268,74 @@
 .action-btn.edit:hover   { background: #1e40af; color: white; }
 .action-btn.delete:hover { background: #dc2626; color: white; }
 
+/* ===== EDIT PRODUCT MODAL ===== */
+.edit-modal {
+    position: fixed;
+    top: 72px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10020;
+    background: rgba(15, 23, 42, 0.46);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    overflow-y: auto;
+}
+
+.edit-modal.open {
+    display: flex;
+}
+
+.edit-modal-shell {
+    width: 100%;
+    max-width: 700px;
+    min-height: calc(100vh - 72px - 3rem);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: auto;
+}
+
+.edit-modal-card {
+    background: white;
+    border-radius: 18px;
+    width: 100%;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.2);
+    overflow: hidden;
+    max-height: calc(100vh - 72px - 3rem);
+    display: flex;
+    flex-direction: column;
+    margin: auto;
+}
+
+.edit-modal-header {
+    background: linear-gradient(135deg,var(--primary) 0%,var(--primary-light) 100%);
+    padding: 1.5rem 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.edit-modal-body {
+    padding: 2rem;
+    overflow-y: auto;
+}
+
+.edit-modal-close {
+    background: rgba(255,255,255,0.2);
+    border: none;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    cursor: pointer;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 /* ===== ADD PRODUCT FORM ===== */
 .quick-add-form {
     display: grid;
@@ -386,6 +459,22 @@
     .stats-grid { grid-template-columns: 1fr; }
     .quick-add-form { grid-template-columns: 1fr; }
     .admin-main { padding: 1rem; }
+    .edit-modal {
+        top: 60px;
+        padding: 1rem;
+        align-items: flex-start;
+    }
+    .edit-modal-shell {
+        min-height: calc(100vh - 60px - 2rem);
+        align-items: flex-start;
+    }
+    .edit-modal-card {
+        max-height: calc(100vh - 60px - 2rem);
+    }
+    .edit-modal-header,
+    .edit-modal-body {
+        padding: 1.1rem;
+    }
 }
 </style>
 {% endblock %}
@@ -498,7 +587,10 @@
             <div class="admin-section">
                 <div class="admin-section-header">
                     <h2><span class="material-symbols-outlined">mail</span> Liên hệ gần đây</h2>
-                    <a href="#" onclick="showTab('contacts', document.getElementById('nav-contacts')); return false;" style="font-size:0.8rem; color:var(--primary);">Xem tất cả →</a>
+                    <a href="#" onclick="showTab('contacts', document.getElementById('nav-contacts')); return false;" style="font-size:0.8rem; color:var(--primary);display:inline-flex;align-items:center;gap:0.25rem;">
+                        Xem tất cả
+                        <span class="material-symbols-outlined" style="font-size:1rem">arrow_forward</span>
+                    </a>
                 </div>
                 {% if contacts %}
                 <table class="admin-table">
@@ -729,6 +821,7 @@
                         .up-item { width:96px; height:96px; border:1px solid #d9d9d9; border-radius:4px; display:flex; align-items:center; justify-content:center; position:relative; background:#fafafa; overflow:hidden; flex-shrink:0;}
                         .up-item img, .up-item video { width:100%; height:100%; object-fit:contain; }
                         .up-item .del-btn { position:absolute; top:0; right:0; background:rgba(0,0,0,0.5); color:white; font-size:10px; width:20px; height:20px; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:10; border-bottom-left-radius:4px; transition:0.2s; }
+                        .up-item .del-btn .material-symbols-outlined { font-size:12px; }
                         .up-item .del-btn:hover { background:rgba(220,38,38,0.9); }
                         .shopee-note { font-size:0.875rem; color:#999; margin-top:0.75rem; line-height:1.5; }
                         .shopee-note ul { margin:0; padding-left:1.2rem; }
@@ -806,7 +899,7 @@
                                 placeholder="Mô tả chi tiết sản phẩm: chất liệu, kiểu dáng, tính năng nổi bật, hướng dẫn bảo quản...
 VD: Áo sơ mi Oxford cao cấp, chất liệu cotton 100% thoáng mát, form regular fit phù hợp mọi vóc dáng. Thích hợp đi làm, đi chơi. Máy giặt ở nhiệt độ thường."></textarea>
                             <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.35rem">
-                                💡 Mô tả càng chi tiết → khách hàng càng tin tưởng → tỉ lệ chuyển đổi cao hơn
+                                Mô tả càng chi tiết thì khách hàng càng dễ hình dung sản phẩm và tăng khả năng chốt đơn.
                             </div>
                         </div>
 
@@ -831,7 +924,7 @@ VD: Áo sơ mi Oxford cao cấp, chất liệu cotton 100% thoáng mát, form re
                                 placeholder="VD: S, M, L, XL, XXL  —  hoặc: 30, 32, 34  —  hoặc: One Size"
                                 style="margin-bottom:0.75rem;border-color:#cbd5e1">
                             <div style="font-size:0.8rem;color:#475569;line-height:1.7;padding-left:0.25rem;">
-                                💡 <strong>Nhập các size cách nhau bởi dấu phẩy.</strong><br>
+                                <strong>Nhập các size cách nhau bởi dấu phẩy.</strong><br>
                                 • Thời trang: <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-family:monospace;color:#334155;border:1px solid #e2e8f0">S, M, L, XL, XXL</code><br>
                                 • Quần: <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-family:monospace;color:#334155;border:1px solid #e2e8f0">28, 30, 32, 34, 36</code><br>
                                 • Phụ kiện/Mắt kính: <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-family:monospace;color:#334155;border:1px solid #e2e8f0">One Size</code><br>
@@ -841,10 +934,10 @@ VD: Áo sơ mi Oxford cao cấp, chất liệu cotton 100% thoáng mát, form re
                             <!-- Quick fill buttons -->
                             <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:1rem;align-items:center;">
                                 <span style="font-size:0.8rem;color:#475569;font-weight:600;margin-right:0.25rem;">Điền nhanh:</span>
-                                <button type="button" onclick="fillSizes('XS, S, M, L, XL, XXL')" style="background:#f1f5f9;border:1px solid #cbd5e1;color:#475569;border-radius:6px;padding:4px 12px;font-size:0.75rem;font-weight:500;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='#e2e8f0';this.style.borderColor='#94a3b8'" onmouseout="this.style.background='#f1f5f9';this.style.borderColor='#cbd5e1'">Áo (XS→XXL)</button>
-                                <button type="button" onclick="fillSizes('S, M, L, XL, XXL')" style="background:#f1f5f9;border:1px solid #cbd5e1;color:#475569;border-radius:6px;padding:4px 12px;font-size:0.75rem;font-weight:500;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='#e2e8f0';this.style.borderColor='#94a3b8'" onmouseout="this.style.background='#f1f5f9';this.style.borderColor='#cbd5e1'">Áo (S→XXL)</button>
-                                <button type="button" onclick="fillSizes('28, 30, 32, 34, 36, 38')" style="background:#f1f5f9;border:1px solid #cbd5e1;color:#475569;border-radius:6px;padding:4px 12px;font-size:0.75rem;font-weight:500;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='#e2e8f0';this.style.borderColor='#94a3b8'" onmouseout="this.style.background='#f1f5f9';this.style.borderColor='#cbd5e1'">Quần (28→38)</button>
-                                <button type="button" onclick="fillSizes('36, 37, 38, 39, 40, 41, 42, 43')" style="background:#f1f5f9;border:1px solid #cbd5e1;color:#475569;border-radius:6px;padding:4px 12px;font-size:0.75rem;font-weight:500;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='#e2e8f0';this.style.borderColor='#94a3b8'" onmouseout="this.style.background='#f1f5f9';this.style.borderColor='#cbd5e1'">Giày (36→43)</button>
+                                <button type="button" onclick="fillSizes('XS, S, M, L, XL, XXL')" style="background:#f1f5f9;border:1px solid #cbd5e1;color:#475569;border-radius:6px;padding:4px 12px;font-size:0.75rem;font-weight:500;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='#e2e8f0';this.style.borderColor='#94a3b8'" onmouseout="this.style.background='#f1f5f9';this.style.borderColor='#cbd5e1'">Áo (XS - XXL)</button>
+                                <button type="button" onclick="fillSizes('S, M, L, XL, XXL')" style="background:#f1f5f9;border:1px solid #cbd5e1;color:#475569;border-radius:6px;padding:4px 12px;font-size:0.75rem;font-weight:500;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='#e2e8f0';this.style.borderColor='#94a3b8'" onmouseout="this.style.background='#f1f5f9';this.style.borderColor='#cbd5e1'">Áo (S - XXL)</button>
+                                <button type="button" onclick="fillSizes('28, 30, 32, 34, 36, 38')" style="background:#f1f5f9;border:1px solid #cbd5e1;color:#475569;border-radius:6px;padding:4px 12px;font-size:0.75rem;font-weight:500;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='#e2e8f0';this.style.borderColor='#94a3b8'" onmouseout="this.style.background='#f1f5f9';this.style.borderColor='#cbd5e1'">Quần (28 - 38)</button>
+                                <button type="button" onclick="fillSizes('36, 37, 38, 39, 40, 41, 42, 43')" style="background:#f1f5f9;border:1px solid #cbd5e1;color:#475569;border-radius:6px;padding:4px 12px;font-size:0.75rem;font-weight:500;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='#e2e8f0';this.style.borderColor='#94a3b8'" onmouseout="this.style.background='#f1f5f9';this.style.borderColor='#cbd5e1'">Giày (36 - 43)</button>
                                 <button type="button" onclick="fillSizes('One Size')" style="background:#f1f5f9;border:1px solid #cbd5e1;color:#475569;border-radius:6px;padding:4px 12px;font-size:0.75rem;font-weight:500;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='#e2e8f0';this.style.borderColor='#94a3b8'" onmouseout="this.style.background='#f1f5f9';this.style.borderColor='#cbd5e1'">One Size</button>
                                 <button type="button" onclick="fillSizes('')" style="background:#fee2e2;border:1px solid #fca5a5;color:#dc2626;border-radius:6px;padding:4px 12px;font-size:0.75rem;font-weight:500;cursor:pointer;transition:all 0.2s;margin-left:auto" onmouseover="this.style.background='#fecaca';this.style.borderColor='#f87171'" onmouseout="this.style.background='#fee2e2';this.style.borderColor='#fca5a5'">Xóa trống</button>
                             </div>
@@ -956,6 +1049,35 @@ VD: Áo sơ mi Oxford cao cấp, chất liệu cotton 100% thoáng mát, form re
                 <span style="font-size:0.875rem;color:var(--text-muted)">{{ analytics.orders_count }} đơn hàng</span>
             </div>
 
+            {% if analytics.recent_cancelled_orders %}
+            <div class="admin-section" style="border-color:#fecaca;background:#fff7f7">
+                <div class="admin-section-header">
+                    <h2><span class="material-symbols-outlined" style="color:#dc2626">notifications_active</span> Thông báo đơn hàng đã hủy</h2>
+                </div>
+                <div style="display:grid;gap:0.75rem">
+                    {% for order in analytics.recent_cancelled_orders %}
+                    <div style="padding:0.9rem 1rem;border:1px solid #fecaca;border-radius:14px;background:#fff">
+                        <div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+                            <div>
+                                <div style="font-weight:800;color:#111827">Đơn #{{ order.id }} - {{ order.user.display_name if order.user else (order.shipping_name or 'Khách hàng') }}</div>
+                                <div style="font-size:0.82rem;color:var(--text-muted);margin-top:0.2rem">
+                                    Hủy lúc {{ (order.cancelled_at or order.created_at).strftime('%d/%m/%Y %H:%M') }}
+                                </div>
+                            </div>
+                            <a href="{{ url_for('order_detail', order_id=order.id) }}" class="action-btn edit" style="width:auto;padding:0.45rem 0.75rem;text-decoration:none;display:flex;align-items:center;gap:0.35rem">
+                                <span class="material-symbols-outlined" style="font-size:1rem">visibility</span>
+                                Xem đơn
+                            </a>
+                        </div>
+                        <div style="margin-top:0.75rem;font-size:0.88rem;color:#991b1b">
+                            <strong>Lý do:</strong> {{ order.cancel_reason or 'Đơn hàng được hủy.' }}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
             <div class="admin-section">
                 <div class="admin-section-header">
                     <h2><span class="material-symbols-outlined">receipt_long</span> Đơn hàng gần đây</h2>
@@ -974,13 +1096,20 @@ VD: Áo sơ mi Oxford cao cấp, chất liệu cotton 100% thoáng mát, form re
                                         #{{ order.id }}
                                     </a>
                                 </td>
-                                <td>{{ order.user.username if order.user else '—' }}</td>
+                                <td>
+                                    <div style="font-weight:700">{{ order.user.display_name if order.user else (order.shipping_name or '—') }}</div>
+                                    {% if order.cancel_reason %}
+                                    <div style="font-size:0.76rem;color:#b91c1c;margin-top:0.25rem">Lý do hủy: {{ order.cancel_reason }}</div>
+                                    {% endif %}
+                                </td>
                                 <td style="color:var(--primary);font-weight:700">{{ "{:,.0f}".format(order.total_amount) }}đ</td>
                                 <td>
                                     {% if order.payment_status == 'paid' %}
                                         <span class="badge badge-green">Paid</span>
                                     {% elif order.payment_status == 'initiated' %}
                                         <span class="badge badge-blue">Initiated</span>
+                                    {% elif order.payment_status == 'cancelled' %}
+                                        <span class="badge badge-red">Cancelled</span>
                                     {% elif order.payment_status == 'failed' %}
                                         <span class="badge badge-red">Failed</span>
                                     {% else %}
@@ -1195,11 +1324,11 @@ VD: Áo sơ mi Oxford cao cấp, chất liệu cotton 100% thoáng mát, form re
 </div>
 
 <!-- ===== EDIT PRODUCT MODAL ===== -->
-<div id="editModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);overflow-y:auto">
-    <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:2rem">
-        <div style="background:white;border-radius:18px;width:100%;max-width:700px;box-shadow:0 24px 60px rgba(0,0,0,0.2);overflow:hidden">
+<div id="editModal" class="edit-modal">
+    <div class="edit-modal-shell">
+        <div class="edit-modal-card">
             <!-- Header -->
-            <div style="background:linear-gradient(135deg,var(--primary) 0%,var(--primary-light) 100%);padding:1.5rem 2rem;display:flex;align-items:center;justify-content:space-between">
+            <div class="edit-modal-header">
                 <div style="display:flex;align-items:center;gap:0.75rem;color:white">
                     <span class="material-symbols-outlined" style="font-size:1.4rem">edit_square</span>
                     <div>
@@ -1207,13 +1336,13 @@ VD: Áo sơ mi Oxford cao cấp, chất liệu cotton 100% thoáng mát, form re
                         <div id="editModalProductName" style="font-size:0.8rem;opacity:0.8;margin-top:1px"></div>
                     </div>
                 </div>
-                <button onclick="closeEditModal()" style="background:rgba(255,255,255,0.2);border:none;border-radius:50%;width:36px;height:36px;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center">
+                <button type="button" onclick="closeEditModal()" class="edit-modal-close">
                     <span class="material-symbols-outlined" style="font-size:1.2rem">close</span>
                 </button>
             </div>
 
             <!-- Form -->
-            <form id="editProductForm" method="POST" enctype="multipart/form-data" style="padding:2rem">
+            <form id="editProductForm" method="POST" enctype="multipart/form-data" class="edit-modal-body">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem">
@@ -1285,7 +1414,7 @@ VD: Áo sơ mi Oxford cao cấp, chất liệu cotton 100% thoáng mát, form re
                             placeholder="VD: S, M, L, XL, XXL  —  hoặc: 30, 32, 34  —  hoặc: One Size"
                             style="margin-bottom:0.75rem;border-color:#cbd5e1">
                         <div style="font-size:0.8rem;color:#475569;line-height:1.7;padding-left:0.25rem;">
-                            💡 <strong>Nhập các size cách nhau bởi dấu phẩy.</strong><br>
+                            <strong>Nhập các size cách nhau bởi dấu phẩy.</strong><br>
                             • Thời trang: <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-family:monospace;color:#334155;border:1px solid #e2e8f0">S, M, L, XL, XXL</code><br>
                             • Quần: <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-family:monospace;color:#334155;border:1px solid #e2e8f0">28, 30, 32, 34, 36</code><br>
                             • Phụ kiện/Mắt kính: <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-family:monospace;color:#334155;border:1px solid #e2e8f0">One Size</code><br>
@@ -1294,10 +1423,10 @@ VD: Áo sơ mi Oxford cao cấp, chất liệu cotton 100% thoáng mát, form re
                         </div>
                         <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:1rem;align-items:center;">
                             <span style="font-size:0.8rem;color:#475569;font-weight:600;margin-right:0.25rem;">Điền nhanh:</span>
-                            <button type="button" onclick="editFillSizes('XS, S, M, L, XL, XXL')" style="background:#f1f5f9;border:1px solid #cbd5e1;color:#475569;border-radius:6px;padding:4px 12px;font-size:0.75rem;font-weight:500;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='#e2e8f0';this.style.borderColor='#94a3b8'" onmouseout="this.style.background='#f1f5f9';this.style.borderColor='#cbd5e1'">Áo (XS→XXL)</button>
-                            <button type="button" onclick="editFillSizes('S, M, L, XL, XXL')" style="background:#f1f5f9;border:1px solid #cbd5e1;color:#475569;border-radius:6px;padding:4px 12px;font-size:0.75rem;font-weight:500;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='#e2e8f0';this.style.borderColor='#94a3b8'" onmouseout="this.style.background='#f1f5f9';this.style.borderColor='#cbd5e1'">Áo (S→XXL)</button>
-                            <button type="button" onclick="editFillSizes('28, 30, 32, 34, 36, 38')" style="background:#f1f5f9;border:1px solid #cbd5e1;color:#475569;border-radius:6px;padding:4px 12px;font-size:0.75rem;font-weight:500;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='#e2e8f0';this.style.borderColor='#94a3b8'" onmouseout="this.style.background='#f1f5f9';this.style.borderColor='#cbd5e1'">Quần (28→38)</button>
-                            <button type="button" onclick="editFillSizes('36, 37, 38, 39, 40, 41, 42, 43')" style="background:#f1f5f9;border:1px solid #cbd5e1;color:#475569;border-radius:6px;padding:4px 12px;font-size:0.75rem;font-weight:500;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='#e2e8f0';this.style.borderColor='#94a3b8'" onmouseout="this.style.background='#f1f5f9';this.style.borderColor='#cbd5e1'">Giày (36→43)</button>
+                            <button type="button" onclick="editFillSizes('XS, S, M, L, XL, XXL')" style="background:#f1f5f9;border:1px solid #cbd5e1;color:#475569;border-radius:6px;padding:4px 12px;font-size:0.75rem;font-weight:500;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='#e2e8f0';this.style.borderColor='#94a3b8'" onmouseout="this.style.background='#f1f5f9';this.style.borderColor='#cbd5e1'">Áo (XS - XXL)</button>
+                            <button type="button" onclick="editFillSizes('S, M, L, XL, XXL')" style="background:#f1f5f9;border:1px solid #cbd5e1;color:#475569;border-radius:6px;padding:4px 12px;font-size:0.75rem;font-weight:500;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='#e2e8f0';this.style.borderColor='#94a3b8'" onmouseout="this.style.background='#f1f5f9';this.style.borderColor='#cbd5e1'">Áo (S - XXL)</button>
+                            <button type="button" onclick="editFillSizes('28, 30, 32, 34, 36, 38')" style="background:#f1f5f9;border:1px solid #cbd5e1;color:#475569;border-radius:6px;padding:4px 12px;font-size:0.75rem;font-weight:500;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='#e2e8f0';this.style.borderColor='#94a3b8'" onmouseout="this.style.background='#f1f5f9';this.style.borderColor='#cbd5e1'">Quần (28 - 38)</button>
+                            <button type="button" onclick="editFillSizes('36, 37, 38, 39, 40, 41, 42, 43')" style="background:#f1f5f9;border:1px solid #cbd5e1;color:#475569;border-radius:6px;padding:4px 12px;font-size:0.75rem;font-weight:500;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='#e2e8f0';this.style.borderColor='#94a3b8'" onmouseout="this.style.background='#f1f5f9';this.style.borderColor='#cbd5e1'">Giày (36 - 43)</button>
                             <button type="button" onclick="editFillSizes('One Size')" style="background:#f1f5f9;border:1px solid #cbd5e1;color:#475569;border-radius:6px;padding:4px 12px;font-size:0.75rem;font-weight:500;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='#e2e8f0';this.style.borderColor='#94a3b8'" onmouseout="this.style.background='#f1f5f9';this.style.borderColor='#cbd5e1'">One Size</button>
                             <button type="button" onclick="editFillSizes('')" style="background:#fee2e2;border:1px solid #fca5a5;color:#dc2626;border-radius:6px;padding:4px 12px;font-size:0.75rem;font-weight:500;cursor:pointer;transition:all 0.2s;margin-left:auto" onmouseover="this.style.background='#fecaca';this.style.borderColor='#f87171'" onmouseout="this.style.background='#fee2e2';this.style.borderColor='#fca5a5'">Xóa trống</button>
                         </div>
@@ -1363,20 +1492,49 @@ VD: Áo sơ mi Oxford cao cấp, chất liệu cotton 100% thoáng mát, form re
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 // ===== TAB SWITCHING =====
-function showTab(tab, el) {
+function resetAdminScroll() {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    const adminMain = document.querySelector('.admin-main');
+    if (adminMain) adminMain.scrollTop = 0;
+}
+
+function showTab(tab, el, options = {}) {
+    const { updateUrl = true, resetScroll = true } = options;
     document.querySelectorAll('[id^="tab-"]').forEach(t => t.style.display = 'none');
     document.getElementById('tab-' + tab).style.display = 'block';
     document.querySelectorAll('.admin-nav-link').forEach(l => l.classList.remove('active'));
     if (el) el.classList.add('active');
+
+    if (updateUrl) {
+        const url = new URL(window.location.href);
+        if (tab === 'overview') {
+            url.searchParams.delete('tab');
+        } else {
+            url.searchParams.set('tab', tab);
+        }
+        window.history.replaceState({ adminTab: tab }, '', url.toString());
+    }
+
+    if (resetScroll) {
+        requestAnimationFrame(resetAdminScroll);
+    }
+}
+
+if ('scrollRestoration' in history) {
+    history.scrollRestoration = 'manual';
 }
 
 // Check URL param for initial tab
 const urlParams = new URLSearchParams(window.location.search);
-const initTab = urlParams.get('tab');
-if (initTab) {
-    const navEl = document.getElementById('nav-' + initTab);
-    showTab(initTab, navEl);
-}
+const initTab = urlParams.get('tab') || 'overview';
+const initNavEl = document.getElementById('nav-' + initTab) || document.getElementById('nav-overview');
+showTab(initTab, initNavEl, { updateUrl: false, resetScroll: true });
+
+window.addEventListener('load', function() {
+    requestAnimationFrame(resetAdminScroll);
+});
 
 // ===== PRICE FORMATTING =====
 function formatPrice(input, hiddenId) {
@@ -1398,6 +1556,13 @@ function fillSizes(val) {
 }
 
 // ===== EDIT PRODUCT MODAL =====
+const editModal = document.getElementById('editModal');
+const editModalBody = document.querySelector('.edit-modal-body');
+
+if (editModal && editModal.parentElement !== document.body) {
+    document.body.appendChild(editModal);
+}
+
 function openEditModal(btn) {
     const d = btn.dataset;
     // Set form action
@@ -1456,13 +1621,27 @@ function openEditModal(btn) {
     }
     document.getElementById('edit_sizes').value = sizesDisplay;
     // Show modal
-    document.getElementById('editModal').style.display = 'block';
+    editModal.classList.add('open');
     document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    requestAnimationFrame(() => {
+        editModal.scrollTop = 0;
+        if (editModalBody) {
+            editModalBody.scrollTop = 0;
+        }
+    });
 }
 
 function closeEditModal() {
-    document.getElementById('editModal').style.display = 'none';
+    editModal.classList.remove('open');
     document.body.style.overflow = '';
+    document.documentElement.style.overflow = '';
+    requestAnimationFrame(() => {
+        editModal.scrollTop = 0;
+        if (editModalBody) {
+            editModalBody.scrollTop = 0;
+        }
+    });
 }
 
 function editFillSizes(val) {
@@ -1504,8 +1683,24 @@ function handleEditFileUpload(input) {
 }
 
 // Close modal when clicking backdrop
-document.getElementById('editModal').addEventListener('click', function(e) {
-    if (e.target === this) closeEditModal();
+if (editModal) {
+    editModal.addEventListener('click', function(e) {
+        if (e.target === this) closeEditModal();
+    });
+}
+
+const editModalCard = document.querySelector('.edit-modal-card');
+if (editModalCard) {
+    editModalCard.addEventListener('click', function(e) {
+        e.stopPropagation();
+    });
+}
+
+document.addEventListener('keydown', function(e) {
+    const editModal = document.getElementById('editModal');
+    if (e.key === 'Escape' && editModal && editModal.classList.contains('open')) {
+        closeEditModal();
+    }
 });
 
 // ===== UPLOAD PREVIEW (SHOPEE STYLE) =====
@@ -1530,7 +1725,7 @@ function handleShopeeCover(input) {
         div.style.position = 'absolute';
         div.innerHTML = `
             <img src="${e.target.result}">
-            <div class="del-btn" onclick="removeShopeeCover(event)">✕</div>
+            <div class="del-btn" onclick="removeShopeeCover(event)"><span class="material-symbols-outlined">close</span></div>
         `;
         box.appendChild(div);
     };
@@ -1577,7 +1772,7 @@ function updateShopeeImagesPreview() {
             div.style.borderStyle = 'solid';
             div.innerHTML = `
                 <img src="${e.target.result}">
-                <div class="del-btn" onclick="removeShopeeImage(event, ${index})">✕</div>
+                <div class="del-btn" onclick="removeShopeeImage(event, ${index})"><span class="material-symbols-outlined">close</span></div>
             `;
             container.appendChild(div);
         };
@@ -1617,7 +1812,7 @@ function handleShopeeVideo(input) {
     div.style.background = '#000';
     div.innerHTML = `
         <video src="${url}" controls style="width:100%;height:100%;object-fit:contain;"></video>
-        <div class="del-btn" onclick="removeShopeeVideo(event)">✕</div>
+        <div class="del-btn" onclick="removeShopeeVideo(event)"><span class="material-symbols-outlined">close</span></div>
     `;
     box.appendChild(div);
 }

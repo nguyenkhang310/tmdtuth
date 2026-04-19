@@ -98,6 +98,9 @@
     padding: 0.3rem 0.85rem;
     border-radius: 999px; font-size: 0.78rem; font-weight: 600;
 }
+.status-badge .material-symbols-outlined {
+    font-size: 0.95rem;
+}
 .status-pending   { background: #fef3c7; color: #92400e; }
 .status-paid      { background: #d1fae5; color: #065f46; }
 .status-shipped   { background: #dbeafe; color: #1e40af; }
@@ -143,11 +146,93 @@
     border-radius: 8px;
     font-weight: 600;
 }
+.btn-danger {
+    background: #fee2e2;
+    color: #b91c1c;
+    border: 2px solid #fecaca;
+}
+.btn-danger:hover {
+    background: #fecaca;
+}
+.cancel-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    z-index: 2000;
+}
+.cancel-modal.open { display: flex; }
+.cancel-dialog {
+    width: 100%;
+    max-width: 480px;
+    background: #fff;
+    border-radius: 18px;
+    padding: 1.25rem;
+    box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25);
+}
+.cancel-dialog textarea {
+    width: 100%;
+    min-height: 120px;
+    margin-top: 0.85rem;
+    padding: 0.85rem 0.95rem;
+    border-radius: 12px;
+    border: 1.5px solid var(--border);
+    font-family: inherit;
+    font-size: 0.92rem;
+    resize: vertical;
+}
+.cancel-dialog textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(10,92,54,0.1);
+}
+.cancel-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+}
+.cancel-reason-list {
+    display: grid;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+.cancel-reason-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.7rem;
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 0.85rem 0.95rem;
+    background: #fafaf9;
+    cursor: pointer;
+}
+.cancel-reason-item input {
+    margin-top: 0.2rem;
+    accent-color: var(--primary);
+}
+.cancel-reason-item span {
+    font-size: 0.9rem;
+    color: var(--text);
+    line-height: 1.45;
+}
+.cancel-other-note {
+    display: none;
+    margin-top: 0.75rem;
+}
+.cancel-other-note.open { display: block; }
 
 @media (max-width: 640px) {
     .account-hero h1 { font-size: 1.5rem; }
     .order-card-header { flex-direction: column; align-items: flex-start; }
     .order-meta { text-align: left; }
+    .orders-section { padding: 0 1rem; }
+    .account-tabs-inner { overflow-x: auto; }
+    .cancel-dialog { padding: 1rem; }
 }
 </style>
 {% endblock %}
@@ -160,7 +245,7 @@
             <span class="material-symbols-outlined">person</span>
         </div>
         <div>
-            <h1>{{ current_user.username }}</h1>
+            <h1>{{ current_user.display_name }}</h1>
             <p>{{ current_user.email }}</p>
         </div>
     </div>
@@ -215,18 +300,24 @@
             <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap">
                 {% set s = order.status %}
                 <span class="status-badge status-{{ s }}">
-                    {% if s == 'pending' %}⏳ Chờ xử lý
-                    {% elif s == 'paid' %}💳 Đã thanh toán
-                    {% elif s == 'shipped' %}🚚 Đang giao hàng
-                    {% elif s == 'delivered' %}✅ Đã giao
-                    {% elif s == 'cancelled' %}❌ Đã hủy
+                    {% if s == 'pending' %}<span class="material-symbols-outlined">schedule</span> Chờ xử lý
+                    {% elif s == 'paid' %}<span class="material-symbols-outlined">credit_card</span> Đã thanh toán
+                    {% elif s == 'shipped' %}<span class="material-symbols-outlined">local_shipping</span> Đang giao hàng
+                    {% elif s == 'delivered' %}<span class="material-symbols-outlined">check_circle</span> Đã giao
+                    {% elif s == 'cancelled' %}<span class="material-symbols-outlined">cancel</span> Đã hủy
                     {% else %}{{ s }}{% endif %}
                 </span>
                 {% set ps = order.payment_status %}
                 {% if ps == 'unpaid' %}
-                <span class="status-badge" style="background:#fef3c7;color:#92400e">💰 Chưa thanh toán</span>
+                <span class="status-badge" style="background:#fef3c7;color:#92400e"><span class="material-symbols-outlined">payments</span> Chưa thanh toán</span>
+                {% elif ps == 'initiated' %}
+                <span class="status-badge" style="background:#dbeafe;color:#1d4ed8"><span class="material-symbols-outlined">autorenew</span> Đang chờ thanh toán</span>
                 {% elif ps == 'paid' %}
-                <span class="status-badge" style="background:#d1fae5;color:#065f46">💳 Đã TT</span>
+                <span class="status-badge" style="background:#d1fae5;color:#065f46"><span class="material-symbols-outlined">credit_card</span> Đã thanh toán</span>
+                {% elif ps == 'failed' %}
+                <span class="status-badge" style="background:#fee2e2;color:#b91c1c"><span class="material-symbols-outlined">error</span> Thanh toán lỗi</span>
+                {% elif ps == 'cancelled' %}
+                <span class="status-badge" style="background:#fee2e2;color:#b91c1c"><span class="material-symbols-outlined">cancel</span> Thanh toán đã hủy</span>
                 {% endif %}
             </div>
         </div>
@@ -235,7 +326,7 @@
             <div class="order-preview">
                 {% for item in preview_items %}
                 <img class="order-preview-img"
-                     src="{{ item.product.image_url if item.product and item.product.image_url else url_for('static', filename='placeholder.png') }}"
+                     src="{{ item.product.image_url if item.product and item.product.image_url else url_for('static', filename='logo.png') }}"
                      alt="{{ item.product.name if item.product else 'Sản phẩm đã gỡ' }}"
                      title="{{ item.product.name if item.product else 'Sản phẩm đã gỡ' }} x{{ item.quantity }}">
                 {% endfor %}
@@ -255,6 +346,14 @@
                         <span class="material-symbols-outlined" style="font-size:0.9rem">visibility</span>
                         Chi tiết
                     </a>
+                    {% if order.status not in ['shipped', 'delivered', 'cancelled'] %}
+                    <button type="button"
+                            class="btn btn-sm btn-danger"
+                            onclick="openCancelModal('{{ url_for('cancel_order', order_id=order.id) }}', '#{{ order.id }}')">
+                        <span class="material-symbols-outlined" style="font-size:0.9rem">cancel</span>
+                        Hủy đơn
+                    </button>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -262,4 +361,86 @@
     {% endfor %}
     {% endif %}
 </div>
+
+<div class="cancel-modal" id="cancel-modal" onclick="closeCancelModal(event)">
+    <div class="cancel-dialog">
+        <div style="font-size:1.1rem;font-weight:800">Hủy đơn hàng <span id="cancel-order-label"></span></div>
+        <div style="color:var(--text-muted);font-size:0.88rem;margin-top:0.35rem">
+            Vui lòng cho biết lý do để cửa hàng hỗ trợ nhanh hơn.
+        </div>
+        <form method="POST" id="cancel-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="cancel-reason-list">
+                {% for reason in order_cancel_reasons %}
+                <label class="cancel-reason-item">
+                    <input type="radio" name="cancel_reason_choice" value="{{ reason }}" required>
+                    <span>{{ reason }}</span>
+                </label>
+                {% endfor %}
+                <label class="cancel-reason-item">
+                    <input type="radio" name="cancel_reason_choice" value="__other__" required>
+                    <span>Lý do khác</span>
+                </label>
+            </div>
+            <div class="cancel-other-note" id="cancel-other-note">
+                <textarea name="cancel_reason_note" id="cancel-reason-note" placeholder="Nhập lý do hủy đơn hàng của bạn..." minlength="5"></textarea>
+            </div>
+            <div class="cancel-actions">
+                <button type="button" class="btn btn-outline btn-sm" onclick="closeCancelModalDirect()">Đóng</button>
+                <button type="submit" class="btn btn-sm btn-danger">Xác nhận hủy</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const cancelModal = document.getElementById('cancel-modal');
+const cancelForm = document.getElementById('cancel-form');
+const cancelReasonNote = document.getElementById('cancel-reason-note');
+const cancelOtherNote = document.getElementById('cancel-other-note');
+const cancelOrderLabel = document.getElementById('cancel-order-label');
+const cancelReasonChoices = Array.from(document.querySelectorAll('input[name="cancel_reason_choice"]'));
+
+function openCancelModal(actionUrl, orderLabel) {
+    cancelForm.action = actionUrl;
+    cancelOrderLabel.textContent = orderLabel || '';
+    cancelForm.reset();
+    cancelOtherNote.classList.remove('open');
+    cancelReasonNote.value = '';
+    cancelModal.classList.add('open');
+    setTimeout(() => {
+        if (cancelReasonChoices[0]) cancelReasonChoices[0].focus();
+    }, 50);
+}
+
+function closeCancelModal(event) {
+    if (event.target === cancelModal) {
+        closeCancelModalDirect();
+    }
+}
+
+function closeCancelModalDirect() {
+    cancelModal.classList.remove('open');
+}
+
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeCancelModalDirect();
+    }
+});
+
+function handleCancelReasonChange() {
+    const selected = document.querySelector('input[name="cancel_reason_choice"]:checked');
+    const isOther = selected && selected.value === '__other__';
+    cancelOtherNote.classList.toggle('open', Boolean(isOther));
+    cancelReasonNote.required = Boolean(isOther);
+    if (!isOther) {
+        cancelReasonNote.value = '';
+    }
+}
+
+cancelReasonChoices.forEach((input) => input.addEventListener('change', handleCancelReasonChange));
+</script>
 {% endblock %}

@@ -1,21 +1,43 @@
+from __future__ import annotations
+
 from extensions import db
 from flask_login import UserMixin
 from datetime import datetime, timedelta
+import hashlib
 import secrets
 
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(150), unique=True, nullable=False)
+    first_name = db.Column(db.String(100), nullable=True)
+    last_name = db.Column(db.String(100), nullable=True)
     email = db.Column(db.String(150), unique=True, nullable=False)
+    phone = db.Column(db.String(30), nullable=True)
+    address = db.Column(db.String(500), nullable=True)
+    birth_date = db.Column(db.Date, nullable=True)
     password_hash = db.Column(db.String(256), nullable=False)
     role = db.Column(db.String(50), default='user') # 'admin' or 'user'
+    policy_accepted_at = db.Column(db.DateTime, nullable=True)
     reset_token = db.Column(db.String(100), nullable=True, unique=True)
     reset_token_expires = db.Column(db.DateTime, nullable=True)
 
+    @property
+    def full_name(self) -> str:
+        parts = [part.strip() for part in [self.last_name or '', self.first_name or ''] if part and part.strip()]
+        return ' '.join(parts).strip()
+
+    @property
+    def display_name(self) -> str:
+        return self.full_name or self.username
+
+    @staticmethod
+    def hash_reset_token(token: str) -> str:
+        return hashlib.sha256((token or '').encode('utf-8')).hexdigest()
+
     def generate_reset_token(self, expires_minutes: int = 30) -> str:
-        """Tạo token reset mật khẩu có thời hạn, lưu vào model."""
+        """Tạo token reset mật khẩu có thời hạn, lưu hash vào model."""
         token = secrets.token_urlsafe(48)
-        self.reset_token = token
+        self.reset_token = self.hash_reset_token(token)
         self.reset_token_expires = datetime.utcnow() + timedelta(minutes=expires_minutes)
         return token
 
@@ -24,9 +46,11 @@ class User(db.Model, UserMixin):
         self.reset_token = None
         self.reset_token_expires = None
 
-    def is_reset_token_valid(self) -> bool:
-        """Kiểm tra token còn hạn không."""
+    def is_reset_token_valid(self, token: str | None = None) -> bool:
+        """Kiểm tra token còn hạn và khớp hash hay không."""
         if not self.reset_token or not self.reset_token_expires:
+            return False
+        if token and self.reset_token != self.hash_reset_token(token):
             return False
         return datetime.utcnow() < self.reset_token_expires
     
@@ -103,6 +127,8 @@ class Order(db.Model):
     shipping_phone = db.Column(db.String(30), nullable=True)
     shipping_address = db.Column(db.String(500), nullable=True)
     note = db.Column(db.String(500), nullable=True)
+    cancel_reason = db.Column(db.String(500), nullable=True)
+    cancelled_at = db.Column(db.DateTime, nullable=True)
 
     # Payment info
     payment_method = db.Column(db.String(50), default='COD')  # COD, BANK_TRANSFER, MOMO, VNPAY
@@ -144,7 +170,7 @@ class OrderItem(db.Model):
     quantity = db.Column(db.Integer, nullable=False)
     price = db.Column(db.Float, nullable=False) # price at the time of purchase
     
-    product = db.relationship('Product')
+    product = db.relationship('Product', overlaps='order_items,product_ref')
 
 class Review(db.Model):
     id = db.Column(db.Integer, primary_key=True)

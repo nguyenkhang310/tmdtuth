@@ -233,9 +233,109 @@
 .empty-cart p { color: var(--text-muted); margin-bottom: 2rem; }
 
 @media (max-width: 768px) {
-    .cart-page { grid-template-columns: 1fr; }
-    .cart-title { grid-column: 1; }
-    .cart-summary { position: static; }
+    .cart-page {
+        grid-template-columns: 1fr;
+        padding: 1.5rem 1rem 2rem;
+        gap: 1.25rem;
+    }
+    .cart-title {
+        grid-column: 1;
+        font-size: 1.7rem;
+        margin-bottom: 0.75rem;
+    }
+    .cart-item {
+        display: grid;
+        grid-template-columns: 84px minmax(0, 1fr) auto;
+        gap: 0.9rem;
+        padding: 1rem;
+        align-items: start;
+    }
+    .cart-item-img {
+        width: 84px;
+        height: 104px;
+        grid-row: 1 / span 2;
+    }
+    .cart-item-info {
+        grid-column: 2;
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+    }
+    .cart-item-meta {
+        margin-bottom: 0.2rem;
+    }
+    .cart-item-qty {
+        grid-column: 2;
+        grid-row: 2;
+        justify-self: start;
+        margin-top: 0.2rem;
+    }
+    .cart-item-remove {
+        grid-column: 3;
+        grid-row: 1 / span 2;
+        align-self: center;
+        justify-self: end;
+        margin-top: 0;
+    }
+    .cart-summary {
+        position: static;
+        padding: 1.25rem;
+        border-radius: 18px;
+    }
+    .summary-title {
+        font-size: 1.15rem;
+        margin-bottom: 1rem;
+        padding-bottom: 0.85rem;
+    }
+    .summary-total .value {
+        font-size: 1.9rem;
+    }
+    .promo-input {
+        flex-direction: column;
+    }
+    .promo-input button {
+        width: 100%;
+        padding: 0.8rem 1rem;
+    }
+    .checkout-btn {
+        padding: 0.95rem;
+    }
+}
+
+@media (max-width: 420px) {
+    .cart-page {
+        padding-left: 0.8rem;
+        padding-right: 0.8rem;
+    }
+    .cart-title {
+        font-size: 1.55rem;
+    }
+    .cart-item {
+        grid-template-columns: 72px minmax(0, 1fr) auto;
+    }
+    .cart-item-img {
+        width: 72px;
+        height: 92px;
+    }
+    .cart-item-name {
+        font-size: 0.95rem;
+    }
+    .cart-item-price {
+        font-size: 0.95rem;
+    }
+    .cart-item-qty button,
+    .cart-item-qty input {
+        height: 30px;
+    }
+    .cart-item-qty button {
+        width: 30px;
+    }
+    .cart-item-qty input {
+        width: 36px;
+    }
+    .summary-total .value {
+        font-size: 1.7rem;
+    }
 }
 </style>
 {% endblock %}

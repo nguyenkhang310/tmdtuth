@@ -146,6 +146,11 @@
     background: var(--surface2); color: var(--text-muted); cursor: default;
 }
 .form-hint { font-size: 0.78rem; color: var(--text-muted); }
+.full-row { grid-column: 1 / -1; }
+.textarea-input {
+    min-height: 96px;
+    resize: vertical;
+}
 
 .form-divider {
     border: none; border-top: 1px solid var(--border);
@@ -182,6 +187,15 @@
 @media (max-width: 640px) {
     .form-row { grid-template-columns: 1fr; }
     .account-hero h1 { font-size: 1.5rem; }
+    .account-hero { padding: 2.75rem 1rem 2rem; }
+    .account-hero-inner,
+    .account-tabs-inner,
+    .profile-section { padding-left: 1rem; padding-right: 1rem; }
+    .account-tabs-inner {
+        overflow-x: auto;
+        scrollbar-width: thin;
+    }
+    .profile-card-body { padding: 1rem; }
 }
 </style>
 {% endblock %}
@@ -194,7 +208,7 @@
             <span class="material-symbols-outlined">person</span>
         </div>
         <div>
-            <h1>{{ current_user.username }}</h1>
+            <h1>{{ current_user.display_name }}</h1>
             <p>{{ current_user.email }}</p>
         </div>
     </div>
@@ -225,7 +239,7 @@
             <div class="profile-avatar-big">
                 <span class="material-symbols-outlined">person</span>
             </div>
-            <h3>{{ current_user.username }}</h3>
+            <h3>{{ current_user.display_name }}</h3>
             <p>{{ current_user.email }}</p>
         </div>
         <div class="profile-sidebar-stats">
@@ -269,6 +283,18 @@
                     <input type="hidden" name="action" value="update_info">
                     <div class="form-row">
                         <div class="form-group">
+                            <label class="form-label" for="last_name">Họ và tên đệm</label>
+                            <input class="form-input" type="text" id="last_name" name="last_name"
+                                   value="{{ current_user.last_name or '' }}" required autocomplete="family-name">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="first_name">Tên</label>
+                            <input class="form-input" type="text" id="first_name" name="first_name"
+                                   value="{{ current_user.first_name or '' }}" required autocomplete="given-name">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
                             <label class="form-label" for="username">Tên đăng nhập</label>
                             <input class="form-input" type="text" id="username" name="username"
                                    value="{{ current_user.username }}" required autocomplete="username">
@@ -277,6 +303,25 @@
                             <label class="form-label" for="email">Email</label>
                             <input class="form-input" type="email" id="email" name="email"
                                    value="{{ current_user.email }}" required autocomplete="email">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="phone">Số điện thoại</label>
+                            <input class="form-input" type="tel" id="phone" name="phone"
+                                   value="{{ current_user.phone or '' }}" autocomplete="tel" placeholder="09xxxxxxxx">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="birth_date">Ngày sinh</label>
+                            <input class="form-input" type="date" id="birth_date" name="birth_date"
+                                   value="{{ current_user.birth_date.isoformat() if current_user.birth_date else '' }}" autocomplete="bday">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group full-row">
+                            <label class="form-label" for="address">Địa chỉ</label>
+                            <textarea class="form-input textarea-input" id="address" name="address" autocomplete="street-address" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành">{{ current_user.address or '' }}</textarea>
+                            <span class="form-hint">Thông tin này sẽ được tự động điền ở bước thanh toán.</span>
                         </div>
                     </div>
                     <div class="form-actions">
@@ -316,7 +361,7 @@
                             <label class="form-label" for="new_password">Mật khẩu mới</label>
                             <div class="pw-toggle">
                                 <input class="form-input" type="password" id="new_password"
-                                       name="new_password" required minlength="6" autocomplete="new-password">
+                                       name="new_password" required minlength="8" autocomplete="new-password">
                                 <button type="button" class="pw-toggle-btn" onclick="togglePw('new_password', this)">
                                     <span class="material-symbols-outlined" style="font-size:1.1rem">visibility</span>
                                 </button>

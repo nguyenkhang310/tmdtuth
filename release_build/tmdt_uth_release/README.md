@@ -1,0 +1,485 @@
+# BÁO CÁO CẤU TRÚC KỸ THUẬT VÀ PHÂN TÍCH HỆ THỐNG THƯƠNG MẠI ĐIỆN TỬ (UTH STORE)
+
+Tài liệu này là một bản phân tích chuyên sâu toàn diện về nền tảng thương mại điện tử **UTH Store**. Tài liệu được viết đặc biệt để phục vụ cho mục đích làm tài liệu thiết kế hệ thống, báo cáo đồ án môn học, đánh giá kiến trúc phần mềm và làm tài liệu hướng dẫn kỹ thuật cho các kỹ sư phát triển.
+
+---
+
+## 1. TỔNG QUAN DỰ ÁN VÀ NGHIỆP VỤ HỆ THỐNG
+
+**UTH Store** là hệ thống mua sắm trực tuyến tập trung vào mặt hàng thời trang, được xây dựng bằng Python Framework (Flask) và cấu trúc cơ sở dữ liệu quan hệ (SQLite/SQLAlchemy).
+Hệ thống giải quyết các bài toán thiết yếu của một trang bán hàng kỹ thuật số, bao gồm:
+*   Trải nghiệm khách hàng xuyên suốt: Duyệt sản phẩm, tìm kiếm từ khóa, bộ lọc thông minh, đến việc lựa chọn hàng hóa bằng giỏ hàng tạm (session-based) và giỏ hàng vĩnh viễn (database-backed).
+*   Chuyển đổi số thanh toán: Tích hợp hai cổng thanh toán tự động (MOMO, VNPAY) kết hợp với các hình thức truyền thống (COD, Chuyển khoản ngân hàng).
+*   Công cụ Quản trị (Admin panel): Kiểm soát tình trạng đơn hàng, điều hành mã giảm giá, và mở rộng danh mục sản phẩm hoàn toàn tự động.
+
+---
+
+## 2. KIẾN TRÚC VÀ CÁC THÀNH PHẦN CÔNG NGHỆ CHÍNH
+
+Hệ thống tuân thủ chặt chẽ kiến trúc Client-Server và triển khai theo mô hình MVC (Model-View-Controller) mở rộng thông qua Flask Framework:
+
+*   **Backend & Routing:** Xây dựng trên nền tảng Python 3 với `Flask`. Quản lý các tuyến đường bằng Router, hàm xử lý dữ liệu và Business Logic (nghiệp vụ).
+*   **Database Access Layer:** `SQLAlchemy` đóng vai trò ORM, tự động chuyển đổi đối tượng Python thành mã lệnh truy vấn SQL.
+*   **View Layer (Giao diện):** `Jinja2` đóng vai trò Templating Engine, truyền dẫn dữ liệu động từ backend trộn với HTML/CSS/JS thuần để gửi trả lại Client.
+*   **Security & Policy Layer:** `Flask-WTF` tạo mã CSRF Token bảo vệ truy cập. `Werkzeug.security` băm mật khẩu khách hàng một chiều (PBKDF2 SHA256). `Flask-Limiter` với `Redis` kiểm soát phòng ngừa tận gốc các tấn công DDoS.
+
+### 2.1. Sơ Đồ Khối Kiến Trúc Tương Tác Hệ Thống (System Architecture)
+
+```mermaid
+graph LR
+    A[Trình duyệt của máy khách] <-->|Gửi Request / Nhận Response| B["Máy chủ xử lý lõi (Python/Flask)"]
+    B <-->|Truy vấn / Trả kết quả| C[("Hệ quản trị cơ sở dữ liệu (SQLite)")]
+    B <-->|Dữ liệu giao dịch| D["Máy chủ của cổng thanh toán trực tuyến (MoMo, VNPAY)"]
+```
+
+### 2.2. Sơ Đồ Luồng Hoạt Động (Flowchart Request-Response Lifecycle)
+
+```mermaid
+flowchart TD
+    A([Trình duyệt gửi Request]) --> B{Lớp chặn thư rác<br>Limiter trên Redis}
+    B -- Cho qua --> C{Xác thực mã thông báo<br>chống giả mạo CSRF}
+    C -- Hợp lệ --> D[Hàm xử lý logic tại máy chủ<br>tệp app.py]
+    D --> E[Bộ trộn giao diện<br>Jinja2]
+    E --> F([Trả mã HTML về lại trình duyệt])
+```
+
+### 2.3. Sơ Đồ Thực Thể Kết Hợp (ER Diagram)
+
+```mermaid
+erDiagram
+    CATEGORY ||--o{ PRODUCT : "1-N"
+    PRODUCT ||--o{ CART_ITEM : "nằm trong"
+    CART ||--o{ CART_ITEM : "master-detail"
+    USER ||--|| CART : "sở hữu"
+    USER ||--o{ ORDER : "đặt"
+    USER ||--o{ REVIEW : "viết"
+    PRODUCT ||--o{ ORDER_ITEM : "nội dung"
+    ORDER ||--o{ ORDER_ITEM : "bao gồm"
+    ORDER ||--o| PAYMENT_TRANSACTION : "liên kết"
+    PRODUCT ||--o{ REVIEW : "nhận được"
+
+    USER {
+        int id PK
+        string username
+    }
+    CATEGORY {
+        int id PK
+        string name
+    }
+    PRODUCT {
+        int id PK
+        string name
+        int category_id FK
+    }
+    CART {
+        int id PK
+        int user_id FK
+    }
+    CART_ITEM {
+        int id PK
+        int cart_id FK
+        int product_id FK
+    }
+    ORDER {
+        int id PK
+        int user_id FK
+    }
+    ORDER_ITEM {
+        int id PK
+        int order_id FK
+        int product_id FK
+    }
+    PAYMENT_TRANSACTION {
+        int id PK
+        int order_id FK
+        text raw_response "Lưu chuỗi dữ liệu thô dạng JSON"
+    }
+    COUPON {
+        int id PK
+        string code
+    }
+    REVIEW {
+        int id PK
+        int user_id FK
+        int product_id FK
+    }
+```
+
+### 2.4. Biểu Đồ Lớp (Class Diagram)
+
+```mermaid
+classDiagram
+    class User {
+        +Integer id
+        +String username
+        +String email
+        +String password_hash
+        +String role
+        +carts (Backref)
+        +orders (Backref)
+        +reviews (Backref)
+        +wishlist_items (Backref)
+    }
+
+    class Category {
+        +Integer id
+        +String name
+        +products (Backref)
+    }
+
+    class Product {
+        +Integer id
+        +String name
+        +Text description
+        +Float price
+        +Float old_price
+        +String image_url
+        +Integer stock
+        +DateTime created_at
+        +Integer category_id
+        +Boolean is_new
+        +Boolean is_on_sale
+        +reviews (Backref)
+        +order_items (Backref)
+    }
+
+    class Cart {
+        +Integer id
+        +Integer user_id
+        +items (Backref)
+    }
+
+    class CartItem {
+        +Integer id
+        +Integer cart_id
+        +Integer product_id
+        +Integer quantity
+    }
+
+    class Order {
+        +Integer id
+        +Integer user_id
+        +Float total_amount
+        +String status
+        +DateTime created_at
+        +String shipping_name
+        +String shipping_phone
+        +String shipping_address
+        +String note
+        +String payment_method
+        +String payment_status
+        +String payment_ref
+        +items (Backref)
+        +transactions (Backref)
+    }
+
+    class PaymentTransaction {
+        +Integer id
+        +Integer order_id
+        +String provider
+        +Float amount
+        +String status
+        +String provider_ref
+        +Text raw_request
+        +Text raw_response
+        +DateTime created_at
+    }
+
+    class Coupon {
+        +Integer id
+        +String code
+        +String coupon_type
+        +Float value
+        +Float min_subtotal
+        +Boolean is_active
+        +DateTime expires_at
+        +Integer max_uses
+        +Integer used_count
+        +DateTime created_at
+    }
+
+    class OrderItem {
+        +Integer id
+        +Integer order_id
+        +Integer product_id
+        +Integer quantity
+        +Float price
+    }
+
+    class Review {
+        +Integer id
+        +Integer product_id
+        +Integer user_id
+        +Integer rating
+        +Text comment
+        +DateTime created_at
+    }
+
+    Category "1" *-- "many" Product : Khóa ngoại (category_id)
+    User "1" *-- "many" Cart : Khóa ngoại (user_id)
+    User "1" *-- "many" Order : Khóa ngoại (user_id)
+    User "1" *-- "many" Review : Khóa ngoại (user_id)
+    Cart "1" *-- "many" CartItem : Khóa ngoại (cart_id)
+    Product "1" *-- "many" CartItem : Khóa ngoại (product_id)
+    Order "1" *-- "many" OrderItem : Khóa ngoại (order_id)
+    Product "1" *-- "many" OrderItem : Khóa ngoại (product_id)
+    Order "1" *-- "many" PaymentTransaction : Khóa ngoại (order_id)
+    Product "1" *-- "many" Review : Khóa ngoại (product_id)
+```
+
+### 2.5. Các Biểu Đồ Hoạt Động (Activity Diagram)
+
+#### 2.5.1. Luồng Cơ Chế Gộp Giỏ Hàng
+
+```mermaid
+flowchart TD
+    Start([Khách vãng lai chọn sản phẩm]) --> A[Lưu trên phiên bộ nhớ tạm]
+    A --> B[Khách tiến hành đăng ký/đăng nhập]
+    B --> C[Hệ thống tự động quét mảng dữ liệu phiên]
+    C --> D[Đồng nhất hóa / Lưu vào bảng giỏ hàng trong cơ sở dữ liệu của người dùng]
+    D --> End([Kết thúc])
+```
+
+#### 2.5.2. Luồng Thanh Toán và Mã Khuyến Mãi
+
+```mermaid
+flowchart TD
+    Start([Bắt đầu tính toán giỏ hàng]) --> Fork(( ))
+    
+    Fork --> Calc1[Trừ theo tỷ lệ phần trăm]
+    Fork --> Calc2[Trừ thẳng mức giá cố định]
+    Fork --> Calc3[Chiết khấu miễn phí giao hàng nội đô]
+    
+    Calc1 --> Join(( ))
+    Calc2 --> Join(( ))
+    Calc3 --> Join(( ))
+    
+    Join --> Total[Gộp thành một tổng tiền duy nhất]
+    Total --> Decision{Lựa chọn thanh toán}
+    
+    Decision -- Thẻ ngân hàng --> Bank[Giao diện thanh toán thẻ ngân hàng]
+    Decision -- Ví điện tử --> EWallet[Giao diện thanh toán ví điện tử]
+```
+
+### 2.6. Các Biểu Đồ Tuần Tự (Sequence Diagram)
+
+#### 2.6.1. Vòng Đời Xử Lý Truy Vấn
+
+```mermaid
+sequenceDiagram
+    participant Client as Máy khách
+    participant Server as Máy chủ
+    participant DB as Cơ sở dữ liệu
+
+    Client->>Server: Máy khách gửi dữ liệu lên
+    activate Server
+    Server->>DB: Máy chủ gọi CSDL
+    activate DB
+    DB-->>Server: CSDL trả dữ liệu cho Máy chủ
+    deactivate DB
+    Server-->>Client: Máy chủ trả kết quả về Trình duyệt
+    deactivate Server
+```
+
+#### 2.6.2. Giao Dịch Thanh Toán Số
+
+```mermaid
+sequenceDiagram
+    participant Client as Khách hàng
+    participant Server as Máy chủ UTH
+    participant Gateway as Cổng thanh toán (MoMo/VNPAY)
+
+    Client->>Server: Khách xác nhận đơn
+    activate Server
+    Server->>Server: Khởi tạo chuẩn giao dịch và mã chữ ký điện tử
+    Server->>Gateway: Máy chủ gửi gói dữ liệu đi và tạo mã kiểm dò bảo mật (HMAC)
+    activate Gateway
+    Gateway->>Gateway: Cổng thanh toán trừ tiền khách
+    Gateway-->>Server: Cổng thanh toán trả kết quả (Webhook) về máy chủ
+    deactivate Gateway
+    Server->>Server: Máy chủ UTH dùng mã kiểm dò đối chiếu với thông báo để xác thực
+    Server-->>Client: Hiển thị kết quả thanh toán
+    deactivate Server
+```
+
+---
+
+## 3. PHÂN TÍCH CHI TIẾT KIẾN TRÚC TẬP TIN DỰ ÁN (FILE BY FILE REPORT)
+
+Dưới đây là một phân tích sâu sát (Deep Dive) về mã nguồn và chức năng điều phối của từng tệp tin độc lập.
+
+### 3.1. Tập tin <code>app.py</code> - Trung Tâm Điều Hành Ứng Dụng (Application Core)
+Tập tin này có dung lượng tài nguyên lớn nhất, tham gia vận hành toàn bộ luồng request-response cycle của hệ thống.
+*   **Khởi tạo ứng dụng & Cấu hình (Config):** Load file biến môi trường (`.env`), cấu hình Secret Key, chuỗi kết nối Database, HTTP-Only Cookie Session. Tại đây khởi tạo biến config môi trường đối trọng tích hợp Momo, VNPay và Ngân hàng.
+*   **Logic Giỏ Hàng (Cart Logic):** Chứa các hàm `_session_cart_get`, `_get_or_create_user_cart`. Đây là khối nghiệp vụ cực kỳ hay: nếu chưa đăng nhập, sử dụng Guest Cart. Khi User làm tiến trình Register hoặc Guest Checkout, hệ thống sẽ gọi chuỗi logic "Cart Merge" nhằm đổ dữ liệu phiên sang CSDL thực để không làm mất sản phẩm vừa chọn. Xử lý thuật toán tồn kho (`product.stock`) để luôn giới hạn lượng sản phẩm khách được phép đặt.
+*   **Bộ máy Khuyến Mãi (Coupon Engine):** Xử lý thuật toán khấu trừ các tệp mã cứng tĩnh (Static config) hoặc cấu hình động vào cơ cở dữ liệu. Thuật toán chiết khấu chia hàm phân rã ra: phần trăm giỏ (`percent`), trừ thẳng vào trị giá (`fixed`) và miễn phí giao vận (`shipping`).
+*   **Thanh Toán (Payment Integrations):** Thực thi cấu hình chuẩn hóa định dạng giao dịch, khởi tạo Signature và checksum HMAC để đối chiếu thông tin trả ngược về phía Server của Momo và VNPay.
+*   **Điều Hướng (Routing):** Tích hợp tất cả các nhánh URL như xem hàng `/products`, chi tiết sản phẩm `/product/<id>`, thanh toán `/checkout`, `/admin/*` quản lý dành riêng cho `current_user.role == 'admin'`. Khởi tạo hàm `sitemap_xml()` tự động tạo bản đồ cây Sitemap tối ưu Search Engine.
+
+### 3.2. Tập tin <code>models.py</code> - Lớp Lưu Trữ và Ánh Xạ Đối Tượng (Database ORM)
+Bộ gen định hình cách dữ liệu và con trỏ khóa ngoại (Foreign Key) móc nối với nhau, quy định hoàn toàn logic kiến trúc CSDL.
+*   **User:** Quản lý người dùng, kế thừa tham số `UserMixin` hỗ trợ `Flask-Login`. Chứa các khóa ngoại mapping ngược lại `Cart`, `Order`, `Review`. Hệ quản trị cấp quyền được chia ngạch Role: `user` hoặc `admin`.
+*   **Category & Product:** Cấu trúc danh mục và hàng hóa. Hỗ trợ trường thông tin `is_new`, `is_on_sale`, giá thực, giá gốc, URL hình ảnh trực quan, và số lượng quản lý kho (stock).
+*   **Cart & CartItem:** Mối quan hệ master-detail liên kết 1-n, quy đinh giỏ hàng và danh mục bên trong, kết nối thẳng về tài khoản cá thể.
+*   **Order, OrderItem, & PaymentTransaction:** Triển khai CSDL lưu lại vết ghi khi mua sắm. `Order` lưu điểm rơi địa chỉ và logic chốt đơn COD. `PaymentTransaction` dùng riêng cho luồng Giao dịch số chứa tham chiếu chuỗi Json phản hồi thô (raw response) lưu dự phòng kế toán và kiểm kê trạng thái tiền tệ.
+*   **Coupon:** Cấu trúc quy định biến số điều kiện mã giảm giá, giới hạn ngân sách tối thiểu (`min_subtotal`), tổng hạn mức (`max_uses`).
+*   **Review:** Phân tích logic người bình luận bắt buộc phải đi với hệ tham chiếu khoá ngoại về sản phẩm.
+
+### 3.3. Tập tin <code>extensions.py</code> - Mảnh Ghép Mở Rộng Hệ Thống
+Mô hình Circular Dependency của Python bắt buộc phải sử dụng Singleton extension.
+*   Tập tin định sinh ra biến `db = SQLAlchemy()` và quản lý đăng nhập `login_manager = LoginManager()`. Kỹ thuật này giúp phân tách phần khai báo module ra khỏi Controller `app.py`, giữ cho mã nguồn có nền tảng module hóa cao, và tránh tình trạng xoay vòng import không thể tải file.
+
+### 3.4. Tập tin <code>seed.py</code> - Tiến Trình Tự Động Sinh Dữ Liệu Tồn Kho
+*   Một nền tảng cần dữ liệu ngay từ lúc báo cáo đánh giá. Tập tin này chứa mảng danh sách cứng (Hard-coded array) về những thư mục thời trang như áo thun, áo khoác, quần jean...
+*   Kỹ thuật `db.session.add_all()` và `db.session.commit()` tạo lập các sản phẩm nguyên mẫu thử nghiệm cũng như các mật khẩu tài khoản quản trị `admin123` được hash tự động phục vụ nhu cầu kiểm thử (Unit Testing, QA Testing) và đánh giá độ chịu tải.
+
+### 3.5. Tập tin <code>requirements.txt</code> - Cấu Trúc Khung Dependencies
+Bản kê khai các bộ công cụ phát triển phần mềm được kiểm duyệt kỹ càng:
+*   `Flask==3.0.3` và `Werkzeug==3.0.3`: Xương sống của API HTTP.
+*   `Flask-SQLAlchemy==3.1.1` cùng `SQLAlchemy==2.0.31`: Quản trị tương tác CSDL mà không dùng câu lệnh string SQL thuần phục tùng chuẩn mực Clean Code.
+*   `Flask-Limiter==3.8.0` kết hợp `redis==7.4.0`: Cơ chế khống chế bộ nhớ nhằm cân bằng mạng chống Request Spam.
+*   `Flask-WTF`, `requests`, `python-dotenv`: Middleware kiểm soát an toàn và bảo mật, giao tiếp External Restful API.
+
+---
+
+## 4. PHÂN TÍCH LỚP GIAO DIỆN HIỂN THỊ (TEMPLATES LAYER)
+
+Thư mục <code>/templates</code> chứa các giao diện được phân tách bằng ngữ pháp Jinja2 độc bản, nhằm tái sử dụng mã (Reusability).
+
+*   **base.html:** Giao diện gốc (Master layout). Bao gồm cấu trúc `<!DOCTYPE html>`, chứa thẻ gọi thư viện CSS Bootstrap, Javascript, jQuery. Các thẻ meta header thông dụng. Các `<Block>` cấu trúc Navigation Bar, Footer, xử lý hiệu ứng Flashing Messages đều được cấy trong tập tin này.
+*   **index.html:** Điểm rơi trang chủ hệ thống. Kế thừa `base.html`, gọi thẻ vòng lặp hiển thị mảng sản phẩm tiêu biểu theo độ Mới (`is_new`) và hệ số Chiết khấu cao (`is_on_sale`).
+*   **products.html (Trang danh mục sản phẩm):** Nơi xử lý trực tiếp giao diện phân trang (Pagination), chứa cột trái hiển thị Sidebar đa tầng lọc từ Danh sách Category, Range giá trị, và Khuyến mãi.
+*   **product-detail.html:** Thể hiện trực quan chi tiết thiết kế hàng hóa, điều phối nút "Thêm vào giỏ" đi kèm ô chọn Số lượng tồn. Module phân nhánh giao tiếp thẻ hiển thị "Bình luận/Review". Chứa logic xác thực nếu Guest chưa đăng nhập thì không mở nút Bình luận để chống Spam.
+*   **cart.html:** Thể hiện logic toán học frontend (Giá tiền, Thuế phí, Giảm giá coupon, Tổng doanh thu phụ/chính) của bảng danh sách hàng. Khả năng thiết lập tương tác xóa mềm thông qua AJAX.
+*   **checkout.html:** Nơi tập hợp mọi form mẫu chứa thông tin định tuyến giao nhận địa chỉ, có tích hợp kỹ thuật CSRF Hidden Field đảm bảo luồng Data chuẩn. Hiển thị module Chọn loại hình thanh toán Bank Transfer / Stripe / VNPay / MoMo tương ứng.
+*   **admin.html / my-orders.html:** Giao diện điều phối luồng quy trình của Quản trị Hệ thống. Giao diện dạng Bảng (Table Data), ứng dụng màu sắc trạng thái (Status Colors) cho việc điều phối tiến trình đơn hàng Trạng thái hoàn thiện (Shipped / Delivered) một cách trực quan tối đa.
+*   **login.html & profile.html:** Cơ chế bảo quản trạng thái người dùng cá nhân (Session identity). Giao diện đổi thiết lập cá nhân và truy vết mã phiếu giảm giá tự vận hành.
+
+---
+
+## 5. KHÍA CẠNH BẢO MẬT & TỐI ƯU HIỆU SUẤT TRONG KIẾN TRÚC
+
+1.  **Vệ sinh dữ liệu đầu vào (Input Sanitization)**: Khống chế Injection thông qua ORM tĩnh hóa các chuỗi string thành định dạng bảo vệ. Hàm `secure_filename()` của Werkzeug khử trùng tên tập tin (XSS và lổ hổng thư mục Path Traversal).
+2.  **Định tuyến luồng mã hóa PBKDF2**: Không lưu trực tiếp chữ và số ở CSDL mà tạo mã hàm khối Hash 256 giúp bảo mật mật khẩu. Khi rò rỉ dữ liệu Database cũng không thể khai thác quy ngược trở lại plain-text.
+3.  **Cross-Site Request Forgery (CSRF) Tokens**: Hệ thống Flask-WTF sẽ phát hành chuỗi phiên độc nhất cho mảng dữ liệu trình duyệt qua AJAX. Các hình thức khai thác thông qua link rác gắn mã độc để chèn đơn hàng hoàn toàn bị khoá mã.
+4.  **Kiểm soát Tài nguyên mạng (DDoS Mitigation)**: Limiter lưu dữ liệu IP trên nền tảng In-Memory Data của Redis đảm bảo chi phí truy xuất mili-giây.
+
+---
+
+## 6. HƯỚNG DẪN CÀI ĐẶT HỆ THỐNG (INSTALLATION GUIDE)
+
+Dự án này được thiết kế để dễ dàng cài đặt và vận hành trên cả hệ điều hành **Windows** và **macOS**. Hãy làm theo các bước dưới đây để khởi chạy nền tảng trên máy cá nhân của bạn.
+
+### Bước 1: Yêu cầu hệ thống cần chuẩn bị (Prerequisites)
+- Cài đặt **Python 3.8** trở lên. (Tải tại [python.org](https://www.python.org/downloads/)).
+- Đảm bảo bạn đã cài hệ quản trị Git (nếu clone từ Github).
+
+### Bước 2: Thiết lập môi trường ảo (Virtual Environment)
+Môi trường ảo giúp cô lập các thư viện của dự án này để không xung đột với các dự án Python khác trên máy tính của bạn. Mở Terminal (trên Mac) hoặc Command Prompt / PowerShell (trên Windows) và di chuyển vào thư mục dự án `tmdt_uth`.
+
+**Dành cho macOS / Linux:**
+```bash
+# Tạo môi trường ảo có tên là venv
+python3 -m venv venv
+
+# Kích hoạt môi trường ảo
+source venv/bin/activate
+```
+
+**Dành cho Windows:**
+```cmd
+# Tạo môi trường ảo
+python -m venv venv
+
+# Kích hoạt môi trường ảo bằng Command Prompt
+venv\Scripts\activate
+# Hoặc trên PowerShell: .\venv\Scripts\Activate.ps1
+```
+
+*(Dấu hiệu thành công: Dòng lệnh của bạn sẽ có tiền tố `(venv)` ở phía trước).*
+
+### Bước 3: Cài đặt thư viện phụ thuộc (Dependencies)
+```bash
+pip install -r requirements.txt
+```
+
+### Bước 3.1: Cấu hình biến môi trường quan trọng (`.env`)
+Tạo file `.env` ở thư mục gốc dự án để cấu hình khóa bí mật, rate limit, cổng thanh toán và email reset mật khẩu.
+
+Ví dụ tối thiểu cho môi trường phát triển:
+```env
+SECRET_KEY=abcdefghijklmnopqrstuvwxyz123456
+TESTING=0
+FLASK_DEBUG=1
+LIMITER_STORAGE_URI=memory://
+
+# Email reset password (SMTP)
+MAIL_SERVER=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USE_TLS=1
+MAIL_USE_SSL=0
+MAIL_USERNAME=your_email@gmail.com
+MAIL_PASSWORD=your_app_password
+MAIL_DEFAULT_SENDER="UTH Store <your_email@gmail.com>"
+
+# Cho phép log nội dung email ra terminal khi chưa cấu hình SMTP đầy đủ
+MAIL_CONSOLE_FALLBACK=1
+PASSWORD_RESET_EXPIRES_MINUTES=30
+```
+
+Ghi chú:
+- Với Gmail, nên dùng `App Password` thay vì mật khẩu đăng nhập thông thường.
+- Trong môi trường demo cục bộ, nếu chưa cấu hình SMTP, hệ thống sẽ ghi email reset password vào terminal/server log khi `MAIL_CONSOLE_FALLBACK=1`.
+- Trong môi trường triển khai thật, nên tắt `MAIL_CONSOLE_FALLBACK` và cấu hình SMTP đầy đủ.
+
+### Bước 4: Khởi tạo Dữ liệu mẫu (Database Seeding)
+Chỉ cần chạy lệnh này trong **lần đầu tiên** để hệ thống tự động tạo File Database ảo (`ecommerce.db`) và nhồi toàn bộ sản phẩm, danh mục, cấu hình hệ thống mẫu vào.
+```bash
+python seed.py
+```
+
+### Bước 5: Khởi chạy Máy chủ (Run the Server)
+```bash
+python app.py
+```
+Sau khi thấy dòng chữ `Running on http://127.0.0.1:5011`, hãy mở trình duyệt và truy cập vào đường link: **http://127.0.0.1:5011**
+
+### Bước 5.1: Dùng MoMo/VNPAY khi chia sẻ project qua file ZIP
+
+Project sử dụng biến `PUBLIC_URL` để nhận callback/IPN từ MoMo và VNPAY. Khi một thành viên trong nhóm tự chạy project trên máy của họ, người đó cần có một URL public riêng bằng `ngrok`, sau đó cập nhật lại `PUBLIC_URL` trong `.env`.
+
+Để giảm thao tác cho người nhận file zip, project đã có sẵn các file hỗ trợ ở thư mục gốc:
+
+- Windows: `1_start_app_windows.bat`, `2_start_ngrok_windows.bat`, `3_cap_nhat_public_url_windows.bat`
+- macOS: `1_start_app_mac.command`, `2_start_ngrok_mac.command`, `3_cap_nhat_public_url_mac.command`
+
+Hướng dẫn chi tiết từng bước cho cả Windows và macOS nằm trong file [HUONG_DAN_MOMO_VNPAY_NGROK.md](./HUONG_DAN_MOMO_VNPAY_NGROK.md).
+
+---
+
+## 7. HƯỚNG DẪN SỬ DỤNG (USER GUIDE)
+
+### Dành cho Khách hàng (User Frontend):
+1. **Duyệt & Tìm kiếm:** Ngay tại trang chủ, bấm vào phần Sản phẩm để xem toàn bộ danh mục thời trang. Sử dụng thanh Tìm kiếm (Search Bar) bằng cách gõ từ khoá "áo sơ mi" hoặc "jean" để lọc.
+2. **Mua hàng (Giỏ hàng):** Bấm "Thêm vào giỏ" đối với các sản phẩm ưa thích. Hệ thống cho phép bạn mua hàng ngay cả khi là **Khách vãng lai (Guest)** chưa tạo tài khoản.
+3. **Thanh toán (Checkout):** Vào trang thanh toán, nhập thông tin liên lạc và chọn hình thức thanh toán. (Hỗ trợ COD trả sau hoặc thanh toán qua Ví MoMo/VNPAY bằng cách nhập tài khoản Sandbox/Mô phỏng).
+4. **Theo dõi đơn hàng & Tài khoản:** Nếu bấm Đăng ký tài khoản, tính năng "Đơn hàng của tôi" và "Danh sách yêu thích (Wishlist)" sẽ được mở khoá để bạn dễ dàng quản lý việc mua sắm sau này.
+
+### Dành cho Ban Quản Trị (Admin Backend):
+Tham số để đăng nhập tài khoản Quản trị cấp cao mẫu (đã được sinh ra tự động từ `seed.py`):
+- **Email/Username:** `admin`
+- **Mật khẩu:** `admin123`
+
+Sau khi đăng nhập tài khoản trên vào hệ thống, một nút **"Quản trị Admin"** sẽ xuất hiện trên thanh điều hướng Menu (Hoặc truy cập trực tiếp `http://127.0.0.1:5011/admin_dashboard`).
+Tại đây bạn có thể thao tác với 6 module quyền năng:
+1. **Tổng quan & Phân tích:** Xem biểu đồ chốt sales, doanh thu realtime tự động cập nhật mỗi khi có khách mua hàng.
+2. **Sản phẩm:** Cập nhật thông tin hàng hóa, tải ảnh/video mới, điều chỉnh lại giá Sale hoặc khai báo hết hàng. Tính năng "Gỡ/Xóa" đã được mã hóa làm sạch tự động an toàn cho người dùng cuối.
+3. **Đơn hàng:** Bảng điểu khiển giúp bạn duyệt Đơn chờ xử lý và chuyển trạng thái sang "Đang giao" hoặc "Hoàn thành".
+4. **Mã giảm giá (Marketing):** Tạo mã Voucher (Ví dụ siêu sale 50%) giới hạn cho 100 lượt dùng đầu tiên.
+5. **Liên hệ:** Đọc phản hồi, thư rác giải quyết trực tiếp từ nguồn feedback bên ngoài gửi vào.
+
+---
+
+## 8. KẾT LUẬN
+
+Hệ thống UTH Store là một nguyên bản mạnh mẽ, mang đặc thù một cơ cấu hoàn chỉnh trong hệ sinh thái ứng dụng Python Backend. Trục định tuyến mạch lạc kết hợp tính năng bảo mật toàn diện cho phép nền tảng dễ dàng trở thành tư liệu mẫu cao cấp cho mọi công tác nghiên cứu, luận văn hay phát triển thành Commercial System chính thống. Blueprint cấu trúc mở thuận tiện để tiếp tục triển khai Dockerization và Micro-service hóa trong lộ trình tương lai.
