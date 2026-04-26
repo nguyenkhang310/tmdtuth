@@ -348,19 +348,28 @@
     <!-- CART ITEMS -->
     <div class="cart-items">
         {% for item in cart.items %}
+        {% set cart_item_sizes = (item.product.sizes | fromjson) if item.product and item.product.sizes else [] %}
+        {% set cart_item_size = item.size or (cart_item_sizes[0] if cart_item_sizes|length == 1 else '') %}
         <div class="cart-item">
-            <img src="{{ item.product.image_url }}" alt="{{ item.product.name }}" class="cart-item-img">
+            <img src="{{ item.product.image_url or url_for('static', filename='logo.png') }}" alt="{{ item.product.name }}" class="cart-item-img">
             <div class="cart-item-info">
                 <div class="cart-item-name">{{ item.product.name }}</div>
-                <div class="cart-item-meta">{{ item.product.category.name if item.product.category else 'UTH Store' }}</div>
+                <div class="cart-item-meta">
+                    {{ item.product.category.name if item.product.category else 'UTH Store' }}
+                    {% if cart_item_size %}
+                    • Size {{ cart_item_size }}
+                    {% elif cart_item_sizes|length > 1 %}
+                    • <a href="{{ url_for('product_detail', product_id=item.product.id) }}" style="color:#b91c1c;font-weight:700;text-decoration:none">Chọn size</a>
+                    {% endif %}
+                </div>
                 <div class="cart-item-price">{{ "{:,.0f}".format(item.product.price) }}đ</div>
             </div>
-            <div class="cart-item-qty" data-item-id="{{ item.id }}">
+            <div class="cart-item-qty" data-update-url="{{ url_for('update_cart_item_quantity', item_key=item.id) }}">
                 <button type="button" class="qty-btn" data-delta="-1">−</button>
                 <input type="number" class="qty-input" value="{{ item.quantity }}" min="1">
                 <button type="button" class="qty-btn" data-delta="1">+</button>
             </div>
-            <form method="POST" action="{{ url_for('remove_from_cart', item_id=item.id) }}" style="margin:0">
+            <form method="POST" action="{{ url_for('remove_from_cart', item_key=item.id) }}" style="margin:0">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="cart-item-remove" title="Xóa" style="border:none;background:none">
                     <span class="material-symbols-outlined">delete</span>
@@ -442,8 +451,8 @@
 <script>
 const csrfToken = "{{ csrf_token() }}";
 
-async function setQty(itemId, qty) {
-  const res = await fetch(`/cart/item/${itemId}/quantity`, {
+async function setQty(updateUrl, qty) {
+  const res = await fetch(updateUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -458,14 +467,14 @@ async function setQty(itemId, qty) {
 }
 
 document.querySelectorAll('.cart-item-qty').forEach(wrap => {
-  const itemId = wrap.dataset.itemId;
+  const updateUrl = wrap.dataset.updateUrl;
   const input = wrap.querySelector('.qty-input');
   wrap.querySelectorAll('.qty-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const delta = parseInt(btn.dataset.delta, 10);
       const next = Math.max(1, (parseInt(input.value || '1', 10) + delta));
       try {
-        input.value = await setQty(itemId, next);
+        input.value = await setQty(updateUrl, next);
         window.location.reload();
       } catch (e) {
         window.location.reload();
@@ -475,7 +484,7 @@ document.querySelectorAll('.cart-item-qty').forEach(wrap => {
   input.addEventListener('change', async () => {
     const next = Math.max(1, parseInt(input.value || '1', 10));
     try {
-      input.value = await setQty(itemId, next);
+      input.value = await setQty(updateUrl, next);
       window.location.reload();
     } catch (e) {
       window.location.reload();

@@ -118,9 +118,10 @@
   <div class="wishlist-grid">
     {% for item in items %}
     <div class="wishlist-card">
+      {% set wishlist_sizes = (item.product.sizes | fromjson) if item.product and item.product.sizes else [] %}
       <div class="wishlist-img-wrap">
         <a href="{{ url_for('product_detail', product_id=item.product.id) }}">
-          <img src="{{ item.product.image_url }}" alt="{{ item.product.name }}">
+          <img src="{{ item.product.image_url or url_for('static', filename='logo.png') }}" alt="{{ item.product.name }}">
         </a>
         {% if item.product.is_on_sale %}
         <span class="wishlist-badge">Sale</span>
@@ -138,14 +139,24 @@
         </div>
         <div class="wishlist-actions">
           <!-- Nút Thêm vào giỏ hàng -->
+          {% if wishlist_sizes|length > 1 %}
+          <a href="{{ url_for('product_detail', product_id=item.product.id) }}" class="btn-add-cart" style="text-decoration:none">
+            <span class="material-symbols-outlined">straighten</span>
+            Chọn size
+          </a>
+          {% else %}
           <form method="POST" action="{{ url_for('add_to_cart', product_id=item.product.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="quantity" value="1">
+            {% if wishlist_sizes|length == 1 %}
+            <input type="hidden" name="size" value="{{ wishlist_sizes[0] }}">
+            {% endif %}
             <button type="submit" class="btn-add-cart">
               <span class="material-symbols-outlined">shopping_cart</span>
               Thêm vào giỏ
             </button>
           </form>
+          {% endif %}
           <!-- Xem và Bỏ thích -->
           <div class="wishlist-bottom-row">
             <a href="{{ url_for('product_detail', product_id=item.product.id) }}" class="btn-view">

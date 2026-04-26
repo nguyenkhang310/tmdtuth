@@ -97,6 +97,7 @@ class CartItem(db.Model):
     cart_id = db.Column(db.Integer, db.ForeignKey('cart.id'), nullable=False)
     product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
     quantity = db.Column(db.Integer, default=1)
+    size = db.Column(db.String(50), nullable=True)
     
     product = db.relationship('Product')
 
@@ -129,6 +130,7 @@ class Order(db.Model):
     note = db.Column(db.String(500), nullable=True)
     cancel_reason = db.Column(db.String(500), nullable=True)
     cancelled_at = db.Column(db.DateTime, nullable=True)
+    cancel_notification_dismissed = db.Column(db.Boolean, default=False, nullable=False)
 
     # Payment info
     payment_method = db.Column(db.String(50), default='COD')  # COD, BANK_TRANSFER, MOMO, VNPAY
@@ -169,6 +171,7 @@ class OrderItem(db.Model):
     product_id = db.Column(db.Integer, db.ForeignKey('product.id'), nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
     price = db.Column(db.Float, nullable=False) # price at the time of purchase
+    size = db.Column(db.String(50), nullable=True)
     
     product = db.relationship('Product', overlaps='order_items,product_ref')
 

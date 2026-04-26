@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+{% block title %}Kết quả thanh toán - UTH Store{% endblock %}
+
+{% block extra_styles %}
+<style>
+.payment-result-page{max-width:860px;margin:0 auto;padding:2.5rem 1rem;}
+.payment-result-card{background:#fff;border-radius:18px;padding:1.75rem;box-shadow:0 8px 28px rgba(15,23,42,0.08);}
+.payment-result-head{display:flex;align-items:center;gap:1rem;margin-bottom:1.25rem;}
+.payment-result-icon{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.payment-result-icon.success{background:#dcfce7;color:#166534;}
+.payment-result-icon.pending{background:#dbeafe;color:#1d4ed8;}
+.payment-result-icon.failed{background:#fee2e2;color:#b91c1c;}
+.payment-result-icon .material-symbols-outlined{font-size:2rem;}
+.payment-result-title{font-size:1.8rem;font-weight:900;margin:0 0 0.2rem;}
+.payment-result-sub{color:var(--text-muted);margin:0;}
+.payment-result-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0.9rem;margin:1.5rem 0;}
+.payment-result-item{border:1.5px solid var(--border);border-radius:14px;padding:1rem;background:#fafaf9;}
+.payment-result-label{font-size:0.8rem;font-weight:700;color:var(--text-muted);margin-bottom:0.3rem;}
+.payment-result-value{font-size:1rem;font-weight:800;color:var(--text);}
+.payment-result-actions{display:flex;gap:0.75rem;flex-wrap:wrap;margin-top:1.5rem;}
+.payment-result-note{margin-top:1rem;padding:0.95rem 1rem;border-radius:14px;background:#f8fafc;color:var(--text-muted);border:1.5px solid var(--border);}
+@media (max-width: 640px){
+  .payment-result-page{padding:1.5rem 1rem 2rem;}
+  .payment-result-card{padding:1.25rem;}
+  .payment-result-head{align-items:flex-start;}
+  .payment-result-title{font-size:1.45rem;}
+  .payment-result-grid{grid-template-columns:1fr;}
+  .payment-result-actions .btn{width:100%;}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+{% set is_paid = order.payment_status == 'paid' %}
+{% set is_failed = order.payment_status in ['failed', 'cancelled'] or order.status == 'cancelled' %}
+{% set result_state = 'success' if is_paid else ('failed' if is_failed else 'pending') %}
+{% set retry_endpoint = 'momo_create' if order.payment_method == 'MOMO' else ('vnpay_create' if order.payment_method == 'VNPAY' else '') %}
+
+<div class="payment-result-page">
+  <div class="payment-result-card">
+    <div class="payment-result-head">
+      <div class="payment-result-icon {{ result_state }}">
+        {% if is_paid %}
+        <span class="material-symbols-outlined">check_circle</span>
+        {% elif is_failed %}
+        <span class="material-symbols-outlined">cancel</span>
+        {% else %}
+        <span class="material-symbols-outlined">schedule</span>
+        {% endif %}
+      </div>
+      <div>
+        <h1 class="payment-result-title">
+          {% if is_paid %}
+          Thanh toán thành công
+          {% elif is_failed %}
+          Thanh toán chưa hoàn tất
+          {% else %}
+          Đang chờ xác nhận thanh toán
+          {% endif %}
+        </h1>
+        <p class="payment-result-sub">
+          {% if is_paid %}
+          Đơn hàng #{{ order.id }} đã được ghi nhận và cửa hàng sẽ tiếp tục xử lý.
+          {% elif is_failed %}
+          Đơn hàng #{{ order.id }} chưa được thanh toán thành công. Bạn có thể kiểm tra lại trạng thái bên dưới.
+          {% else %}
+          Cổng thanh toán đã trả kết quả nhưng hệ thống vẫn đang chờ xác nhận cuối cùng từ nhà cung cấp.
+          {% endif %}
+        </p>
+      </div>
+    </div>
+
+    <div class="payment-result-grid">
+      <div class="payment-result-item">
+        <div class="payment-result-label">Mã đơn hàng</div>
+        <div class="payment-result-value">#{{ order.id }}</div>
+      </div>
+      <div class="payment-result-item">
+        <div class="payment-result-label">Phương thức</div>
+        <div class="payment-result-value">{{ order.payment_method }}</div>
+      </div>
+      <div class="payment-result-item">
+        <div class="payment-result-label">Trạng thái đơn hàng</div>
+        <div class="payment-result-value">{{ order.status }}</div>
+      </div>
+      <div class="payment-result-item">
+        <div class="payment-result-label">Trạng thái thanh toán</div>
+        <div class="payment-result-value">{{ order.payment_status }}</div>
+      </div>
+      <div class="payment-result-item">
+        <div class="payment-result-label">Tổng tiền</div>
+        <div class="payment-result-value" style="color:var(--primary)">{{ "{:,.0f}".format(order.total_amount) }}đ</div>
+      </div>
+      <div class="payment-result-item">
+        <div class="payment-result-label">Thời gian tạo đơn</div>
+        <div class="payment-result-value">{{ order.created_at.strftime('%d/%m/%Y %H:%M') if order.created_at else '—' }}</div>
+      </div>
+    </div>
+
+    <div class="payment-result-actions">
+      {% if can_view_order %}
+      <a class="btn btn-primary" href="{{ url_for('order_detail', order_id=order.id) }}">Xem chi tiết đơn hàng</a>
+      {% else %}
+      <a class="btn btn-outline" href="{{ url_for('order_lookup') }}">Tra cứu đơn hàng</a>
+      {% endif %}
+
+      {% if can_view_order and retry_endpoint and order.payment_status != 'paid' and order.status != 'cancelled' %}
+      <a class="btn btn-primary" href="{{ url_for(retry_endpoint, order_id=order.id) }}">
+        {{ 'Thanh toán lại' if order.payment_status in ['initiated', 'failed', 'cancelled'] else 'Tiếp tục thanh toán' }}
+      </a>
+      {% endif %}
+
+      <a class="btn btn-outline" href="{{ url_for('products') }}">Tiếp tục mua sắm</a>
+    </div>
+
+    <div class="payment-result-note">
+      {% if can_view_order %}
+      Bạn vẫn có thể mở lại chi tiết đơn hàng để theo dõi trạng thái giao hàng, thanh toán và các sản phẩm đã đặt.
+      {% else %}
+      Nếu bạn không còn đăng nhập, hãy dùng email đặt hàng tại trang tra cứu đơn để kiểm tra tiến trình mới nhất. Khi cần hỗ trợ thêm, hãy liên hệ cửa hàng và cung cấp mã đơn #{{ order.id }}.
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

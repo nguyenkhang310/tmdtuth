@@ -1,6 +1,7 @@
 from __future__ import annotations
 import os
-from dotenv import load_dotenv
+import ipaddress
+from dotenv import load_dotenv, dotenv_values
 load_dotenv(override=True)
 import sqlite3
 import smtplib
@@ -14,7 +15,7 @@ from urllib.parse import urlparse, urljoin
 import unicodedata
 import re
 from datetime import datetime, timedelta
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, make_response
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, make_response, has_request_context
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from flask_login import login_user, login_required, logout_user, current_user
@@ -24,6 +25,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import requests
 from typing import Optional
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 from extensions import db, login_manager
 from models import User, Category, Product, Cart, CartItem, Order, OrderItem, Review, Contact, PaymentTransaction, WishlistItem, Coupon
@@ -116,6 +118,10 @@ app.config['MOMO_ENDPOINT'] = os.environ.get('MOMO_ENDPOINT') or 'https://test-p
 app.config['MOMO_PARTNER_CODE'] = os.environ.get('MOMO_PARTNER_CODE') or ''
 app.config['MOMO_ACCESS_KEY'] = os.environ.get('MOMO_ACCESS_KEY') or ''
 app.config['MOMO_SECRET_KEY'] = os.environ.get('MOMO_SECRET_KEY') or ''
+app.config['MOMO_REQUEST_TIMEOUT'] = max(
+    10,
+    int((os.environ.get('MOMO_REQUEST_TIMEOUT') or '45').strip() or '45')
+)
 
 app.config['VNPAY_TMN_CODE'] = os.environ.get('VNPAY_TMN_CODE') or ''
 app.config['VNPAY_HASH_SECRET'] = os.environ.get('VNPAY_HASH_SECRET') or ''
@@ -161,7 +167,8 @@ def _safe_json_list(value):
 
 # Upload config
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'static', 'uploads')
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'mp4', 'mov', 'avi'}
+ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'jfif', 'heic', 'heif', 'bmp', 'avif', 'tif', 'tiff'}
+ALLOWED_VIDEO_EXTENSIONS = {'mp4', 'mov', 'avi'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max
 
@@ -220,6 +227,9 @@ def ensure_order_schema():
         cursor.execute("ALTER TABLE 'order' ADD COLUMN cancel_reason VARCHAR(500)")
     if 'cancelled_at' not in cols:
         cursor.execute("ALTER TABLE 'order' ADD COLUMN cancelled_at DATETIME")
+    if 'cancel_notification_dismissed' not in cols:
+        cursor.execute("ALTER TABLE 'order' ADD COLUMN cancel_notification_dismissed BOOLEAN DEFAULT 0")
+        cursor.execute("UPDATE 'order' SET cancel_notification_dismissed = 0 WHERE cancel_notification_dismissed IS NULL")
     if 'payment_method' not in cols:
         cursor.execute("ALTER TABLE 'order' ADD COLUMN payment_method VARCHAR(50) DEFAULT 'COD'")
         cursor.execute("UPDATE 'order' SET payment_method='COD' WHERE payment_method IS NULL")
@@ -228,6 +238,16 @@ def ensure_order_schema():
         cursor.execute("UPDATE 'order' SET payment_status='unpaid' WHERE payment_status IS NULL")
     if 'payment_ref' not in cols:
         cursor.execute("ALTER TABLE 'order' ADD COLUMN payment_ref VARCHAR(200)")
+
+    cursor.execute("PRAGMA table_info(order_item);")
+    order_item_cols = {row[1] for row in cursor.fetchall()}
+    if 'size' not in order_item_cols:
+        cursor.execute("ALTER TABLE order_item ADD COLUMN size VARCHAR(50)")
+
+    cursor.execute("PRAGMA table_info(cart_item);")
+    cart_item_cols = {row[1] for row in cursor.fetchall()}
+    if 'size' not in cart_item_cols:
+        cursor.execute("ALTER TABLE cart_item ADD COLUMN size VARCHAR(50)")
 
     conn.commit()
     conn.close()
@@ -352,6 +372,27 @@ def _build_checkout_profile(user: Optional[User]) -> dict[str, str]:
     }
 
 
+def _payment_result_serializer() -> URLSafeTimedSerializer:
+    return URLSafeTimedSerializer(app.config['SECRET_KEY'], salt='payment-result')
+
+
+def _build_payment_result_token(order_id: int) -> str:
+    return _payment_result_serializer().dumps({'order_id': int(order_id)})
+
+
+def _load_payment_result_token(token: str, max_age_seconds: int = 86400) -> Optional[int]:
+    if not token:
+        return None
+    try:
+        payload = _payment_result_serializer().loads(token, max_age=max_age_seconds)
+    except (BadSignature, SignatureExpired):
+        return None
+    try:
+        return int(payload.get('order_id'))
+    except Exception:
+        return None
+
+
 def _can_cancel_order(order: Order) -> bool:
     return order.status not in ['shipped', 'delivered', 'cancelled']
 
@@ -372,6 +413,7 @@ def _cancel_order(order: Order, reason: str, actor: str = 'user') -> None:
     order.status = 'cancelled'
     order.cancel_reason = (reason or '').strip()
     order.cancelled_at = datetime.utcnow()
+    order.cancel_notification_dismissed = False
     if order.payment_status != 'paid':
         order.payment_status = 'cancelled'
     if actor == 'admin' and not order.cancel_reason:
@@ -386,12 +428,142 @@ def _vnpay_hmac_sha512(secret: str, data: str) -> str:
     return hmac.new(secret.encode('utf-8'), data.encode('utf-8'), hashlib.sha512).hexdigest()
 
 
+def _runtime_env_value(name: str) -> str:
+    env_path = os.path.join(os.path.dirname(__file__), '.env')
+    if os.path.isfile(env_path):
+        try:
+            file_value = str(dotenv_values(env_path).get(name) or '').strip()
+        except Exception:
+            file_value = ''
+        if file_value:
+            os.environ[name] = file_value
+            return file_value
+    return (os.environ.get(name) or '').strip()
+
+
+def _request_base_url() -> str:
+    if not has_request_context():
+        return ''
+    forwarded_proto = (request.headers.get('X-Forwarded-Proto') or '').split(',', 1)[0].strip()
+    forwarded_host = (request.headers.get('X-Forwarded-Host') or '').split(',', 1)[0].strip()
+    scheme = forwarded_proto or request.scheme or ''
+    host = forwarded_host or request.host or ''
+    if not scheme or not host:
+        return ''
+    return f"{scheme}://{host}".rstrip('/')
+
+
+def _is_public_https_url(value: str) -> bool:
+    parsed = urlparse((value or '').strip())
+    host = (parsed.hostname or '').strip().lower()
+    if parsed.scheme != 'https' or not parsed.netloc or not host:
+        return False
+    if host == 'localhost' or host.endswith('.local'):
+        return False
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return True
+    return not (
+        address.is_private
+        or address.is_loopback
+        or address.is_link_local
+        or address.is_reserved
+        or address.is_unspecified
+    )
+
+
+def _looks_like_ngrok_url(value: str) -> bool:
+    host = (urlparse((value or '').strip()).hostname or '').lower()
+    return 'ngrok' in host
+
+
+def _discover_ngrok_public_url() -> str:
+    try:
+        resp = requests.get('http://127.0.0.1:4040/api/tunnels', timeout=1.2)
+        resp.raise_for_status()
+        payload = resp.json()
+    except Exception:
+        return ''
+
+    for tunnel in payload.get('tunnels', []):
+        public_url = str(tunnel.get('public_url') or '').strip()
+        if _is_public_https_url(public_url):
+            return public_url.rstrip('/')
+    return ''
+
+
+def _resolved_public_base_url() -> str:
+    request_base_url = _request_base_url()
+    if _is_public_https_url(request_base_url):
+        return request_base_url.rstrip('/')
+
+    configured_public_url = _runtime_env_value('PUBLIC_URL')
+    live_ngrok_url = _discover_ngrok_public_url()
+
+    if _is_public_https_url(live_ngrok_url):
+        if not _is_public_https_url(configured_public_url):
+            return live_ngrok_url
+        if _looks_like_ngrok_url(configured_public_url) and configured_public_url.rstrip('/') != live_ngrok_url:
+            return live_ngrok_url
+
+    if _is_public_https_url(configured_public_url):
+        return configured_public_url.rstrip('/')
+    if _is_public_https_url(live_ngrok_url):
+        return live_ngrok_url
+    return ''
+
+
+def _public_url_availability_error(public_url: str) -> Optional[str]:
+    public_url = (public_url or '').strip().rstrip('/')
+    if not _is_public_https_url(public_url):
+        return None
+
+    try:
+        resp = requests.get(public_url, timeout=3, allow_redirects=False)
+    except requests.RequestException:
+        if _looks_like_ngrok_url(public_url):
+            return (
+                f'PUBLIC_URL hiện tại ({public_url}) không truy cập được. '
+                'Có thể link ngrok đã hết hạn hoặc ngrok chưa chạy.'
+            )
+        return None
+
+    ngrok_error_code = (resp.headers.get('ngrok-error-code') or '').strip()
+    if ngrok_error_code.startswith('ERR_NGROK_'):
+        return (
+            f'PUBLIC_URL hiện tại ({public_url}) đã hết hạn hoặc ngrok chưa chạy '
+            f'({ngrok_error_code}).'
+        )
+    return None
+
+
 def _absolute_url(endpoint: str, **values) -> str:
-    base_url = os.environ.get('PUBLIC_URL', '').strip()
+    base_url = _resolved_public_base_url()
     if base_url:
-        # Nếu có PUBLIC_URL (ngrok), dùng urljoin với base_url
-        return urljoin(base_url, url_for(endpoint, **values))
+        return urljoin(f"{base_url}/", url_for(endpoint, **values).lstrip('/'))
     return url_for(endpoint, _external=True, **values)
+
+
+def _delete_uploaded_file_from_url(file_url: str | None) -> None:
+    cleaned_url = (file_url or '').strip()
+    if not cleaned_url:
+        return
+    parsed_path = urlparse(cleaned_url).path or cleaned_url
+    marker = '/static/uploads/'
+    if marker not in parsed_path:
+        return
+    filename = os.path.basename(parsed_path.split(marker, 1)[-1])
+    if not filename:
+        return
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    if os.path.isfile(filepath):
+        os.remove(filepath)
+
+
+def _delete_uploaded_media_list(raw_urls: str | None) -> None:
+    for media_url in _safe_json_list(raw_urls):
+        _delete_uploaded_file_from_url(str(media_url))
 
 
 def _missing_payment_env_vars() -> dict[str, list[str]]:
@@ -504,10 +676,45 @@ def _payment_config_error(payment_method: str) -> Optional[str]:
     return None
 
 
+def _payment_public_url_error(payment_method: str) -> Optional[str]:
+    payment_method = (payment_method or '').strip().upper()
+    if payment_method not in ['MOMO', 'VNPAY']:
+        return None
+
+    resolved_public_url = _resolved_public_base_url()
+    if resolved_public_url:
+        availability_error = _public_url_availability_error(resolved_public_url)
+        if availability_error:
+            return (
+                f'{availability_error} Hãy mở lại ngrok, copy link https mới và '
+                'cập nhật PUBLIC_URL trong file .env.'
+            )
+        return None
+
+    public_url = _runtime_env_value('PUBLIC_URL')
+    if public_url and not _is_public_https_url(public_url):
+        return 'PUBLIC_URL phải là một URL https public hợp lệ, ví dụ https://xxxxx.ngrok-free.app.'
+
+    current_base_url = _request_base_url()
+    if current_base_url and not _is_public_https_url(current_base_url):
+        return (
+            f'Bạn đang mở web bằng {current_base_url} nên MoMo/VNPAY không callback được. '
+            'Hãy mở link https của ngrok hoặc cập nhật PUBLIC_URL trong file .env.'
+        )
+
+    return (
+        'Không tìm thấy URL https public cho thanh toán online. Hãy mở ngrok, rồi dùng '
+        'link https đó để vào web hoặc cập nhật PUBLIC_URL trong file .env.'
+    )
+
+
 def _prepare_momo_payment(order: Order) -> str:
     config_error = _payment_config_error('MOMO')
     if config_error:
         raise ValueError(config_error)
+    public_url_error = _payment_public_url_error('MOMO')
+    if public_url_error:
+        raise ValueError(public_url_error)
 
     partner_code = app.config.get('MOMO_PARTNER_CODE', '')
     access_key = app.config.get('MOMO_ACCESS_KEY', '')
@@ -567,20 +774,53 @@ def _prepare_momo_payment(order: Order) -> str:
     db.session.add(tx)
     order.payment_status = 'initiated'
     order.payment_ref = momo_order_id
+    request_timeout = int(app.config.get('MOMO_REQUEST_TIMEOUT') or 45)
 
     try:
-        resp = requests.post(endpoint, json=payload, timeout=20)
+        resp = requests.post(endpoint, json=payload, timeout=request_timeout)
         data = resp.json()
+    except requests.exceptions.ReadTimeout as exc:
+        order.payment_status = 'failed'
+        tx.status = 'failed'
+        tx.raw_response = json.dumps({
+            "error": "read_timeout",
+            "message": str(exc),
+            "timeout": request_timeout,
+        }, ensure_ascii=False)
+        if 'test-payment.momo.vn' in str(endpoint or ''):
+            raise ValueError(
+                'MoMo Sandbox đang phản hồi quá chậm nên chưa tạo được giao dịch. '
+                'Bạn thử lại sau ít phút hoặc tạm dùng VNPAY để demo.'
+            ) from exc
+        raise ValueError(
+            f'MoMo phản hồi quá chậm sau {request_timeout} giây. Vui lòng thử lại.'
+        ) from exc
+    except requests.exceptions.RequestException as exc:
+        order.payment_status = 'failed'
+        tx.status = 'failed'
+        tx.raw_response = json.dumps({
+            "error": "request_exception",
+            "message": str(exc),
+        }, ensure_ascii=False)
+        raise ValueError('Không kết nối được MoMo. Vui lòng thử lại.') from exc
     except Exception as exc:
         order.payment_status = 'failed'
         tx.status = 'failed'
-        raise ValueError('Không kết nối được MoMo. Vui lòng thử lại.') from exc
+        tx.raw_response = json.dumps({
+            "error": "unexpected_exception",
+            "message": str(exc),
+        }, ensure_ascii=False)
+        raise ValueError('Không thể xử lý phản hồi từ MoMo. Vui lòng thử lại.') from exc
 
     tx.raw_response = json.dumps(data, ensure_ascii=False)
     pay_url = data.get('payUrl') or data.get('deeplink') or data.get('qrCodeUrl')
-    if not pay_url or int(data.get('resultCode', -1)) != 0:
+    result_code = int(data.get('resultCode', -1))
+    if not pay_url or result_code != 0:
         order.payment_status = 'failed'
         tx.status = 'failed'
+        message = str(data.get('message') or '').strip()
+        if message:
+            raise ValueError(f"MoMo từ chối yêu cầu ({result_code}): {message}")
         raise ValueError('Tạo thanh toán MoMo thất bại. Vui lòng thử lại.')
 
     return pay_url
@@ -590,6 +830,9 @@ def _prepare_vnpay_payment(order: Order) -> str:
     config_error = _payment_config_error('VNPAY')
     if config_error:
         raise ValueError(config_error)
+    public_url_error = _payment_public_url_error('VNPAY')
+    if public_url_error:
+        raise ValueError(public_url_error)
 
     tmn_code = app.config.get('VNPAY_TMN_CODE', '')
     hash_secret = app.config.get('VNPAY_HASH_SECRET', '')
@@ -662,15 +905,21 @@ def _create_order_from_items(
     db.session.flush()
 
     for item in materialized_items:
-        product, quantity = _extract_cart_line(item)
+        product, quantity, raw_size = _extract_cart_line(item)
         if not product or quantity < 1:
             continue
+        size, _, size_error = _resolve_selected_size(product, raw_size)
+        if size_error == 'missing':
+            raise ValueError(f'Vui lòng chọn size cho sản phẩm "{product.name}" trước khi thanh toán.')
+        if size_error == 'invalid':
+            raise ValueError(f'Size đã chọn cho sản phẩm "{product.name}" không còn hợp lệ. Vui lòng cập nhật lại giỏ hàng.')
         product_id = int(item.product_id) if hasattr(item, 'product_id') else int(product.id)
         db.session.add(OrderItem(
             order_id=order.id,
             product_id=product_id,
             quantity=quantity,
             price=product.price,
+            size=size,
         ))
         if product.stock is not None:
             product.stock = max(0, int(product.stock) - int(quantity))
@@ -748,17 +997,155 @@ with app.app_context():
     ensure_order_schema()
     ensure_user_schema()
 
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+def _allowed_extension(filename: str, allowed_extensions: set[str]) -> bool:
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_extensions
+
+
+def allowed_image_file(filename: str) -> bool:
+    return _allowed_extension(filename, ALLOWED_IMAGE_EXTENSIONS)
+
+
+def allowed_video_file(filename: str) -> bool:
+    return _allowed_extension(filename, ALLOWED_VIDEO_EXTENSIONS)
+
+
+def _parse_currency_value(raw_value: str, field_label: str, *, required: bool = True) -> float | None:
+    cleaned = re.sub(r'[^\d.]', '', (raw_value or '').strip())
+    if not cleaned:
+        if required:
+            raise ValueError(f'Vui lòng nhập {field_label}.')
+        return None
+    try:
+        value = float(cleaned)
+    except ValueError as exc:
+        raise ValueError(f'{field_label} không hợp lệ.') from exc
+    if value <= 0:
+        raise ValueError(f'{field_label} phải lớn hơn 0.')
+    return value
+
+
+def _parse_stock_value(raw_value: str) -> int:
+    cleaned = (raw_value or '').strip()
+    if not cleaned:
+        raise ValueError('Vui lòng nhập tồn kho.')
+    try:
+        stock = int(cleaned)
+    except ValueError as exc:
+        raise ValueError('Tồn kho phải là số nguyên.') from exc
+    if stock < 0:
+        raise ValueError('Tồn kho không được âm.')
+    return stock
+
+
+def _parse_category_action(raw_value: str) -> tuple[int, str | None]:
+    value = (raw_value or '').strip()
+    if not value:
+        raise ValueError('Vui lòng chọn danh mục sản phẩm.')
+    cat_parts = value.split('|', 1)
+    try:
+        category_id = int(cat_parts[0])
+    except ValueError as exc:
+        raise ValueError('Danh mục sản phẩm không hợp lệ.') from exc
+    if not db.session.get(Category, category_id):
+        raise ValueError('Danh mục sản phẩm không tồn tại.')
+    subcategory = cat_parts[1].strip() if len(cat_parts) > 1 and cat_parts[1].strip() else None
+    return category_id, subcategory
+
+
+def _invalid_upload_names(files, validator) -> list[str]:
+    invalid_names: list[str] = []
+    for file in files:
+        if file and file.filename and not validator(file.filename):
+            invalid_names.append(file.filename)
+    return invalid_names
+
+
+def _normalize_size_value(raw_size: str | None) -> str | None:
+    cleaned = (raw_size or '').strip()
+    return cleaned or None
+
+
+def _available_product_sizes(product: Optional[Product]) -> list[str]:
+    if not product:
+        return []
+    sizes: list[str] = []
+    for raw_size in _safe_json_list(getattr(product, 'sizes', None)):
+        cleaned = _normalize_size_value(str(raw_size))
+        if cleaned and cleaned not in sizes:
+            sizes.append(cleaned)
+    return sizes
+
+
+def _resolve_selected_size(product: Optional[Product], raw_size: str | None) -> tuple[str | None, list[str], str | None]:
+    available_sizes = _available_product_sizes(product)
+    selected_size = _normalize_size_value(raw_size)
+    if not available_sizes:
+        return None, available_sizes, None
+    if selected_size:
+        if selected_size in available_sizes:
+            return selected_size, available_sizes, None
+        return None, available_sizes, 'invalid'
+    if len(available_sizes) == 1:
+        return available_sizes[0], available_sizes, None
+    return None, available_sizes, 'missing'
+
+
+def _build_cart_line_key(product_id: int, size: str | None = None) -> str:
+    normalized_size = _normalize_size_value(size) or '__no_size__'
+    size_fingerprint = hashlib.sha1(normalized_size.encode('utf-8')).hexdigest()[:12]
+    return f"{int(product_id)}-{size_fingerprint}"
 
 
 def _session_cart_get() -> dict:
     cart = session.get('cart')
-    if isinstance(cart, dict):
-        return cart
-    cart = {}
-    session['cart'] = cart
-    return cart
+    if not isinstance(cart, dict):
+        cart = {}
+
+    normalized_cart: dict[str, dict[str, int | str | None]] = {}
+    cart_changed = not isinstance(session.get('cart'), dict)
+
+    for raw_key, raw_value in cart.items():
+        try:
+            if isinstance(raw_value, dict):
+                product_id = int(raw_value.get('product_id') or str(raw_key).split('-', 1)[0])
+                quantity = int(raw_value.get('quantity', 0) or 0)
+                size = _normalize_size_value(raw_value.get('size'))
+            else:
+                product_id = int(raw_key)
+                quantity = int(raw_value)
+                size = None
+                cart_changed = True
+        except Exception:
+            cart_changed = True
+            continue
+
+        if quantity < 1:
+            cart_changed = True
+            continue
+
+        item_key = _build_cart_line_key(product_id, size)
+        existing_line = normalized_cart.get(item_key)
+        if existing_line:
+            existing_line['quantity'] = int(existing_line.get('quantity', 0) or 0) + quantity
+        else:
+            normalized_cart[item_key] = {
+                'product_id': product_id,
+                'quantity': quantity,
+                'size': size,
+            }
+
+        if (
+            not isinstance(raw_value, dict)
+            or str(raw_key) != item_key
+            or int(raw_value.get('product_id', 0) or 0) != product_id
+            or int(raw_value.get('quantity', 0) or 0) != quantity
+            or _normalize_size_value(raw_value.get('size')) != size
+        ):
+            cart_changed = True
+
+    if cart_changed:
+        _session_cart_set(normalized_cart)
+    return normalized_cart
 
 
 def _session_cart_set(cart: dict) -> None:
@@ -769,13 +1156,14 @@ def _session_cart_set(cart: dict) -> None:
 def _build_guest_cart_view(cart_dict: dict):
     """
     Build a lightweight cart-like object for templates:
-    - .items: list of { id, product, quantity }
+    - .items: list of { id, product, quantity, size }
     """
     items = []
-    for pid_str, qty in cart_dict.items():
+    for item_key, payload in cart_dict.items():
         try:
-            pid = int(pid_str)
-            qty_int = int(qty)
+            pid = int(payload.get('product_id', 0))
+            qty_int = int(payload.get('quantity', 0))
+            size = _normalize_size_value(payload.get('size'))
         except Exception:
             continue
         if qty_int < 1:
@@ -783,7 +1171,7 @@ def _build_guest_cart_view(cart_dict: dict):
         product = Product.query.get(pid)
         if not product:
             continue
-        items.append({'id': pid, 'product': product, 'quantity': qty_int})
+        items.append({'id': item_key, 'product': product, 'quantity': qty_int, 'size': size})
 
     class _CartView:
         def __init__(self, items):
@@ -806,10 +1194,11 @@ def _merge_session_cart_into_user_cart(user: User) -> None:
     if not cart_dict:
         return
     active_cart = _get_or_create_user_cart(user.id)
-    for pid_str, qty in cart_dict.items():
+    for payload in cart_dict.values():
         try:
-            pid = int(pid_str)
-            qty_int = int(qty)
+            pid = int(payload.get('product_id', 0))
+            qty_int = int(payload.get('quantity', 0))
+            size = _normalize_size_value(payload.get('size'))
         except Exception:
             continue
         if qty_int < 1:
@@ -817,11 +1206,11 @@ def _merge_session_cart_into_user_cart(user: User) -> None:
         product = Product.query.get(pid)
         if not product:
             continue
-        existing = CartItem.query.filter_by(cart_id=active_cart.id, product_id=pid).first()
+        existing = CartItem.query.filter_by(cart_id=active_cart.id, product_id=pid, size=size).first()
         if existing:
             existing.quantity = min(int(existing.quantity) + qty_int, int(product.stock or 10**9))
         else:
-            db.session.add(CartItem(cart_id=active_cart.id, product_id=pid, quantity=qty_int))
+            db.session.add(CartItem(cart_id=active_cart.id, product_id=pid, quantity=qty_int, size=size))
     _session_cart_set({})
     db.session.commit()
 
@@ -839,15 +1228,15 @@ def _normalize_text(value: str) -> str:
 
 def _extract_cart_line(item):
     if hasattr(item, "product"):
-        return item.product, int(item.quantity)
-    return item.get("product"), int(item.get("quantity", 0))
+        return item.product, int(item.quantity), _normalize_size_value(getattr(item, 'size', None))
+    return item.get("product"), int(item.get("quantity", 0)), _normalize_size_value(item.get("size"))
 
 
 def _compute_totals_from_items(items, coupon_code: str | None = None):
     subtotal = 0.0
     item_count = 0
     for item in items:
-        product, qty = _extract_cart_line(item)
+        product, qty, _ = _extract_cart_line(item)
         if not product or qty < 1:
             continue
         subtotal += float(product.price) * qty
@@ -975,7 +1364,7 @@ def api_search():
         results.append({
             'name': p.name,
             'price': "{:,.0f}đ".format(p.price),
-            'image_url': p.image_url,
+            'image_url': p.image_url or url_for('static', filename='logo.png'),
             'url': url_for('product_detail', product_id=p.id)
         })
     return jsonify(results)
@@ -1029,17 +1418,8 @@ def products():
         )
 
     if sub:
-        sub_lower = sub.lower()
-        sub_cap = sub.capitalize()
-        sub_upper = sub.upper()
-        query = query.filter(
-            or_(
-                Product.subcategory == sub,
-                Product.name.contains(sub_lower),
-                Product.name.contains(sub_cap),
-                Product.name.contains(sub_upper)
-            )
-        )
+        # Chỉ lọc theo subcategory chính xác (case-insensitive) để tránh false positive từ tên sản phẩm
+        query = query.filter(func.lower(Product.subcategory) == sub.lower())
 
     pagination = db.paginate(query, page=page, per_page=per_page, error_out=False)
     return render_template('products.html', products=pagination.items, pagination=pagination)
@@ -1190,17 +1570,32 @@ def add_to_cart(product_id):
     if current_user.is_authenticated and current_user.role == 'admin':
         flash('Tài khoản quản trị không thể mua sắm.', 'error')
         return redirect(url_for('product_detail', product_id=product_id))
-    quantity = int(request.form.get('quantity', 1))
+    try:
+        quantity = int(request.form.get('quantity', 1))
+    except Exception:
+        quantity = 1
     if quantity < 1:
         quantity = 1
+    next_target = (request.form.get('next') or '').strip()
     product = Product.query.get_or_404(product_id)
+    selected_size, _, size_error = _resolve_selected_size(product, request.form.get('size'))
+    if size_error == 'missing':
+        flash(f'Vui lòng chọn size cho sản phẩm "{product.name}" trước khi thêm vào giỏ.', 'error')
+        return redirect(url_for('product_detail', product_id=product_id))
+    if size_error == 'invalid':
+        flash(f'Size đã chọn cho sản phẩm "{product.name}" không hợp lệ.', 'error')
+        return redirect(url_for('product_detail', product_id=product_id))
     if product.stock is not None and quantity > product.stock:
         flash(f'Sản phẩm "{product.name}" không đủ tồn kho (còn {product.stock}).', 'error')
         return redirect(url_for('product_detail', product_id=product_id))
 
     if current_user.is_authenticated:
         active_cart = _get_or_create_user_cart(current_user.id)
-        existing = CartItem.query.filter_by(cart_id=active_cart.id, product_id=product_id).first()
+        existing = CartItem.query.filter_by(
+            cart_id=active_cart.id,
+            product_id=product_id,
+            size=selected_size,
+        ).first()
         if existing:
             new_qty = int(existing.quantity) + quantity
             if product.stock is not None and new_qty > product.stock:
@@ -1208,24 +1603,37 @@ def add_to_cart(product_id):
                 flash(f'Giỏ hàng đã được cập nhật tới tối đa tồn kho ({product.stock}).', 'info')
             existing.quantity = new_qty
         else:
-            db.session.add(CartItem(cart_id=active_cart.id, product_id=product_id, quantity=quantity))
+            db.session.add(CartItem(
+                cart_id=active_cart.id,
+                product_id=product_id,
+                quantity=quantity,
+                size=selected_size,
+            ))
         db.session.commit()
     else:
         cart_dict = _session_cart_get()
-        current_qty = int(cart_dict.get(str(product_id), 0) or 0)
+        item_key = _build_cart_line_key(product_id, selected_size)
+        current_line = cart_dict.get(item_key, {})
+        current_qty = int(current_line.get('quantity', 0) or 0)
         new_qty = current_qty + quantity
         if product.stock is not None and new_qty > product.stock:
             new_qty = int(product.stock)
             flash(f'Giỏ hàng đã được cập nhật tới tối đa tồn kho ({product.stock}).', 'info')
-        cart_dict[str(product_id)] = int(new_qty)
+        cart_dict[item_key] = {
+            'product_id': product_id,
+            'quantity': int(new_qty),
+            'size': selected_size,
+        }
         _session_cart_set(cart_dict)
 
     flash('Đã thêm sản phẩm vào giỏ hàng!', 'success')
+    if next_target and _is_safe_redirect_url(next_target):
+        return redirect(next_target)
     return redirect(url_for('cart'))
 
 
-@app.route('/cart/item/<int:item_id>/quantity', methods=['POST'])
-def update_cart_item_quantity(item_id):
+@app.route('/cart/item/<path:item_key>/quantity', methods=['POST'])
+def update_cart_item_quantity(item_key):
     qty = None
     if request.is_json:
         qty = request.json.get('quantity')
@@ -1239,6 +1647,10 @@ def update_cart_item_quantity(item_id):
     if qty < 1:
         qty = 1
     if current_user.is_authenticated:
+        try:
+            item_id = int(item_key)
+        except (TypeError, ValueError):
+            return jsonify({'ok': False, 'error': 'invalid_item'}), 404
         item = CartItem.query.get_or_404(item_id)
         if item.cart.user_id != current_user.id:
             return jsonify({'ok': False, 'error': 'forbidden'}), 403
@@ -1247,27 +1659,34 @@ def update_cart_item_quantity(item_id):
         item.quantity = qty
         db.session.commit()
         return jsonify({'ok': True, 'quantity': item.quantity})
-    # Guest mode: item_id is product_id
-    product = Product.query.get_or_404(item_id)
+    cart_dict = _session_cart_get()
+    cart_line = cart_dict.get(item_key)
+    if not isinstance(cart_line, dict):
+        return jsonify({'ok': False, 'error': 'not_found'}), 404
+    product = Product.query.get_or_404(int(cart_line.get('product_id', 0)))
     if product.stock is not None and qty > product.stock:
         qty = int(product.stock)
-    cart_dict = _session_cart_get()
-    cart_dict[str(product.id)] = int(qty)
+    cart_line['quantity'] = int(qty)
+    cart_dict[item_key] = cart_line
     _session_cart_set(cart_dict)
     return jsonify({'ok': True, 'quantity': int(qty)})
 
-@app.route('/cart/remove/<int:item_id>', methods=['POST'])
-def remove_from_cart(item_id):
+@app.route('/cart/remove/<path:item_key>', methods=['POST'])
+def remove_from_cart(item_key):
     if current_user.is_authenticated:
+        try:
+            item_id = int(item_key)
+        except (TypeError, ValueError):
+            flash('Không tìm thấy sản phẩm trong giỏ hàng.', 'error')
+            return redirect(url_for('cart'))
         item = CartItem.query.get_or_404(item_id)
         if item.cart.user_id == current_user.id:
             db.session.delete(item)
             db.session.commit()
             flash('Đã xóa sản phẩm khỏi giỏ hàng.', 'info')
         return redirect(url_for('cart'))
-    # Guest mode: item_id is product_id
     cart_dict = _session_cart_get()
-    cart_dict.pop(str(item_id), None)
+    cart_dict.pop(item_key, None)
     _session_cart_set(cart_dict)
     flash('Đã xóa sản phẩm khỏi giỏ hàng.', 'info')
     return redirect(url_for('cart'))
@@ -1326,10 +1745,16 @@ def checkout():
 
         # Stock check
         for item in active_cart.items:
-            qty_item = int(item.quantity) if hasattr(item, 'quantity') else int(item.get('quantity', 0))
-            product = item.product if hasattr(item, 'product') else item.get('product')
+            product, qty_item, raw_size = _extract_cart_line(item)
             if qty_item < 1:
                 flash('Số lượng sản phẩm không hợp lệ.', 'error')
+                return redirect(url_for('cart'))
+            selected_size, _, size_error = _resolve_selected_size(product, raw_size)
+            if size_error == 'missing':
+                flash(f'Vui lòng chọn size cho sản phẩm "{product.name}" trước khi thanh toán.', 'error')
+                return redirect(url_for('cart'))
+            if size_error == 'invalid':
+                flash(f'Size đã chọn cho sản phẩm "{product.name}" không còn khả dụng. Vui lòng cập nhật lại giỏ hàng.', 'error')
                 return redirect(url_for('cart'))
             if product.stock is not None and qty_item > product.stock:
                 flash(f'Sản phẩm "{product.name}" không đủ tồn kho (còn {product.stock}).', 'error')
@@ -1518,12 +1943,56 @@ def order_lookup():
     return render_template('order-lookup.html', found_order=found_order, status_steps=status_steps, lookup_email=lookup_email)
 
 
-def _mark_order_paid(order: Order, payment_ref: Optional[str] = None):
+@app.route('/payment/result/<int:order_id>')
+def payment_result(order_id):
+    token_order_id = _load_payment_result_token(request.args.get('token', ''))
+    if token_order_id != order_id:
+        flash('Liên kết kết quả thanh toán không hợp lệ hoặc đã hết hạn.', 'error')
+        return redirect(url_for('index'))
+
+    order = Order.query.get_or_404(order_id)
+    can_view_order = current_user.is_authenticated and (
+        current_user.role == 'admin' or order.user_id == current_user.id
+    )
+    return render_template('payment-result.html', order=order, can_view_order=can_view_order)
+
+
+def _set_order_paid(order: Order, payment_ref: Optional[str] = None):
     order.payment_status = 'paid'
     order.status = 'paid'
     if payment_ref:
         order.payment_ref = payment_ref
+
+
+def _mark_order_paid(order: Order, payment_ref: Optional[str] = None):
+    _set_order_paid(order, payment_ref=payment_ref)
     db.session.commit()
+
+
+def _apply_vnpay_result(
+    order: Order,
+    *,
+    response_code: Optional[str],
+    amount_raw: Optional[str],
+    payment_ref: Optional[str] = None,
+) -> str:
+    if response_code != '00':
+        if order.payment_status != 'paid':
+            order.payment_status = 'failed'
+        return 'failed'
+
+    try:
+        paid_amount = int(amount_raw or 0) // 100
+    except Exception:
+        paid_amount = 0
+
+    if int(round(order.total_amount)) != int(paid_amount):
+        if order.payment_status != 'paid':
+            order.payment_status = 'failed'
+        return 'amount_mismatch'
+
+    _set_order_paid(order, payment_ref=payment_ref)
+    return 'paid'
 
 
 @app.route('/payment/momo/create/<int:order_id>')
@@ -1558,7 +2027,6 @@ def momo_create(order_id):
 
 
 @app.route('/payment/momo/return')
-@login_required
 def momo_return():
     # This is browser return URL. Final confirmation should rely on IPN.
     order_id = _extract_momo_order_id(
@@ -1572,7 +2040,11 @@ def momo_return():
             if order and order.payment_status != 'paid':
                 order.payment_status = 'failed'
                 db.session.commit()
-        return redirect(url_for('order_detail', order_id=order_id))
+        return redirect(url_for(
+            'payment_result',
+            order_id=order_id,
+            token=_build_payment_result_token(order_id),
+        ))
     flash('Không xác định được đơn hàng từ MoMo.', 'error')
     return redirect(url_for('index'))
 
@@ -1679,7 +2151,6 @@ def vnpay_create(order_id):
 
 
 @app.route('/payment/vnpay/return')
-@login_required
 def vnpay_return():
     args = dict(request.args)
     secure_hash = args.pop('vnp_SecureHash', '')
@@ -1700,13 +2171,20 @@ def vnpay_return():
     txn_ref = args.get('vnp_TxnRef', '')
     order_id = _extract_vnpay_order_id(txn_ref)
     if order_id:
-        resp_code = args.get('vnp_ResponseCode')
-        if resp_code and resp_code != '00':
-            order = Order.query.get(order_id)
-            if order and order.payment_status != 'paid':
-                order.payment_status = 'failed'
-                db.session.commit()
-        return redirect(url_for('order_detail', order_id=order_id))
+        order = Order.query.get(order_id)
+        if order:
+            _apply_vnpay_result(
+                order,
+                response_code=args.get('vnp_ResponseCode'),
+                amount_raw=args.get('vnp_Amount'),
+                payment_ref=str(args.get('vnp_TransactionNo') or txn_ref or ''),
+            )
+            db.session.commit()
+        return redirect(url_for(
+            'payment_result',
+            order_id=order_id,
+            token=_build_payment_result_token(order_id),
+        ))
     flash('Không xác định được đơn hàng từ VNPAY.', 'error')
     return redirect(url_for('index'))
 
@@ -1751,22 +2229,17 @@ def vnpay_ipn():
     )
     db.session.add(tx)
 
-    if resp_code == '00':
-        try:
-            paid = int(amount or 0) // 100
-        except Exception:
-            paid = 0
-        if int(round(order.total_amount)) == int(paid):
-            _mark_order_paid(order, payment_ref=str(trans_no or ''))
-            tx.status = 'paid'
-        else:
-            order.payment_status = 'failed'
-            db.session.commit()
-            return "amount_mismatch", 400
-    else:
-        order.payment_status = 'failed'
+    result = _apply_vnpay_result(
+        order,
+        response_code=resp_code,
+        amount_raw=amount,
+        payment_ref=str(trans_no or txn_ref or ''),
+    )
+    tx.status = 'paid' if result == 'paid' else 'failed'
 
     db.session.commit()
+    if result == 'amount_mismatch':
+        return "amount_mismatch", 400
     return "ok", 200
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -1905,12 +2378,10 @@ def reset_password(token):
         return redirect(url_for('index'))
 
     token_hash = User.hash_reset_token(token)
-    user = User.query.filter(
-        or_(User.reset_token == token_hash, User.reset_token == token)
-    ).first()
-    token_matches = bool(user and user.reset_token in {token_hash, token})
+    # DB luôn lưu hash — tìm trực tiếp theo hash, không cần fallback raw token
+    user = User.query.filter(User.reset_token == token_hash).first()
 
-    if not user or not token_matches or not user.is_reset_token_valid():
+    if not user or not user.is_reset_token_valid():
         flash('Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn. Vui lòng thử lại.', 'error')
         return redirect(url_for('forgot_password'))
 
@@ -1944,10 +2415,20 @@ def reset_password(token):
 @limiter.limit("30 per hour")
 def contact():
     if request.method == 'POST':
-        name = request.form.get('name')
-        email = request.form.get('email')
-        subject = request.form.get('subject', '')
-        message = request.form.get('message')
+        name = (request.form.get('name') or '').strip()
+        email = (request.form.get('email') or '').strip().lower()
+        subject = (request.form.get('subject') or '').strip()
+        message = (request.form.get('message') or '').strip()
+        # Validate bắt buộc
+        if not name:
+            flash('Vui lòng nhập họ tên của bạn.', 'error')
+            return redirect(url_for('contact'))
+        if not email or not re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+', email):
+            flash('Vui lòng nhập địa chỉ email hợp lệ.', 'error')
+            return redirect(url_for('contact'))
+        if not message or len(message) < 5:
+            flash('Vui lòng nhập nội dung tin nhắn (ít nhất 5 ký tự).', 'error')
+            return redirect(url_for('contact'))
         contact_entry = Contact(name=name, email=email, subject=subject, message=message)
         db.session.add(contact_entry)
         db.session.commit()
@@ -1972,17 +2453,20 @@ def get_analytics_data():
     orders_today = Order.query.filter(Order.created_at >= today_start).count()
     orders_month = Order.query.filter(Order.created_at >= month_start).count()
 
-    # Revenue
-    total_revenue_row = db.session.query(func.sum(Order.total_amount)).scalar()
+    # Revenue — chỉ tính đơn chưa bị hủy để tránh doanh thu ảo
+    total_revenue_row = db.session.query(func.sum(Order.total_amount))\
+        .filter(Order.status != 'cancelled').scalar()
     total_revenue = total_revenue_row or 0
 
     revenue_month_row = db.session.query(func.sum(Order.total_amount)).filter(
-        Order.created_at >= month_start
+        Order.created_at >= month_start,
+        Order.status != 'cancelled'
     ).scalar()
     revenue_month = revenue_month_row or 0
 
     revenue_today_row = db.session.query(func.sum(Order.total_amount)).filter(
-        Order.created_at >= today_start
+        Order.created_at >= today_start,
+        Order.status != 'cancelled'
     ).scalar()
     revenue_today = revenue_today_row or 0
 
@@ -2039,8 +2523,11 @@ def get_analytics_data():
     category_data = [float(r[1] or 0) for r in category_revenue_raw]
 
     # Đơn hàng gần đây
-    recent_orders = Order.query.order_by(Order.created_at.desc()).limit(10).all()
-    recent_cancelled_orders = Order.query.filter_by(status='cancelled')\
+    recent_orders = Order.query.order_by(Order.created_at.desc()).all()
+    recent_cancelled_orders = Order.query.filter_by(
+        status='cancelled',
+        cancel_notification_dismissed=False,
+    )\
         .order_by(Order.cancelled_at.desc(), Order.created_at.desc())\
         .limit(5).all()
 
@@ -2085,7 +2572,7 @@ def admin_dashboard():
     contacts = Contact.query.order_by(Contact.created_at.desc()).all()
     categories = Category.query.all()
     coupons = Coupon.query.order_by(Coupon.created_at.desc()).all()
-    payment_transactions = PaymentTransaction.query.order_by(PaymentTransaction.created_at.desc()).limit(30).all()
+    payment_transactions = PaymentTransaction.query.order_by(PaymentTransaction.created_at.desc()).all()
     analytics = get_analytics_data()
 
     return render_template('admin.html',
@@ -2100,26 +2587,49 @@ def admin_dashboard():
                            analytics=analytics)
 
 
+@app.route('/admin/order/<int:order_id>/dismiss-cancel-notification', methods=['POST'])
+@login_required
+def admin_dismiss_cancel_notification(order_id):
+    if current_user.role != 'admin':
+        return redirect(url_for('index'))
+
+    order = Order.query.get_or_404(order_id)
+    if order.status != 'cancelled':
+        flash(f'Đơn hàng #{order_id} chưa bị hủy nên không có thông báo để xóa.', 'error')
+        return redirect(url_for('admin_dashboard') + '?tab=orders')
+
+    if not order.cancel_notification_dismissed:
+        order.cancel_notification_dismissed = True
+        db.session.commit()
+        flash(f'Đã ẩn thông báo hủy của đơn hàng #{order_id}.', 'success')
+
+    return redirect(url_for('admin_dashboard') + '?tab=orders')
+
+
 @app.route('/admin/product/add', methods=['POST'])
 @login_required
 def admin_add_product():
     if current_user.role != 'admin':
         return redirect(url_for('index'))
 
-    name = request.form.get('name')
-    price = float(request.form.get('price', 0))
-    old_price_str = request.form.get('old_price', '')
-    old_price = float(old_price_str) if old_price_str else None
-    description = request.form.get('description', '')
-    
-    category_action = request.form.get('category_action', '1|')
-    cat_parts = category_action.split('|')
-    category_id = int(cat_parts[0])
-    subcategory = cat_parts[1] if len(cat_parts) > 1 and cat_parts[1] else None
+    name = (request.form.get('name') or '').strip()
+    description = (request.form.get('description') or '').strip()
+
+    try:
+        if not name:
+            raise ValueError('Vui lòng nhập tên sản phẩm.')
+        price = _parse_currency_value(request.form.get('price', ''), 'giá bán')
+        old_price = _parse_currency_value(request.form.get('old_price', ''), 'giá gốc', required=False)
+        if old_price is not None and old_price <= price:
+            raise ValueError('Giá gốc phải lớn hơn giá bán.')
+        category_id, subcategory = _parse_category_action(request.form.get('category_action', ''))
+        stock = _parse_stock_value(request.form.get('stock', '100'))
+    except ValueError as exc:
+        flash(str(exc), 'error')
+        return redirect(url_for('admin_dashboard') + '?tab=products')
 
     is_new = bool(request.form.get('is_new'))
     is_on_sale = bool(request.form.get('is_on_sale'))
-    stock = int(request.form.get('stock', 100))
 
     # Xử lý sizes tùy chỉnh
     sizes_raw = request.form.get('sizes_input', '').strip()
@@ -2128,14 +2638,44 @@ def admin_add_product():
         sizes_list = [s.strip() for s in sizes_raw.replace('\n', ',').split(',') if s.strip()]
     sizes_json = json.dumps(sizes_list, ensure_ascii=False) if sizes_list else None
 
-    # Xử lý upload ảnh (tối đa 5 ảnh)
-    image_url = request.form.get('image_url', '')
+    # Xử lý upload ảnh:
+    # - `image_file` là ảnh bìa chính của form thêm mới
+    # - `image_files` là danh sách ảnh phụ
+    image_url = (
+        request.form.get('direct_image_url')
+        or request.form.get('image_url')
+        or ''
+    ).strip()
+    cover_file = request.files.get('image_file')
     files = request.files.getlist('image_files')
+    if len([file for file in files if file and file.filename]) > 8:
+        flash('Tối đa chỉ được tải lên 8 ảnh phụ cho mỗi sản phẩm.', 'error')
+        return redirect(url_for('admin_dashboard') + '?tab=products')
     extra_urls = []
-    
-    # Process multiple image files
+
+    image_files_to_check = [file for file in [cover_file, *files] if file and file.filename]
+    if not image_files_to_check and not image_url:
+        flash('Vui lòng tải lên ít nhất 1 hình ảnh cho sản phẩm mới.', 'error')
+        return redirect(url_for('admin_dashboard') + '?tab=products')
+    invalid_image_names = _invalid_upload_names(image_files_to_check, allowed_image_file)
+    if invalid_image_names:
+        flash(
+            'Ảnh không đúng định dạng: ' + ', '.join(invalid_image_names[:3]) +
+            ('' if len(invalid_image_names) <= 3 else '...') +
+            '. Vui lòng dùng JPG, JPEG, PNG, GIF, WEBP, JFIF, HEIC, HEIF, BMP, AVIF hoặc TIFF.',
+            'error'
+        )
+        return redirect(url_for('admin_dashboard') + '?tab=products')
+
+    if cover_file and cover_file.filename and allowed_image_file(cover_file.filename):
+        ext = cover_file.filename.rsplit('.', 1)[1].lower()
+        filename = f"{uuid.uuid4().hex}.{ext}"
+        cover_file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        image_url = url_for('static', filename=f'uploads/{filename}')
+
+    # Process additional image files
     for file in files:
-        if file and file.filename and allowed_file(file.filename):
+        if file and file.filename and allowed_image_file(file.filename):
             ext = file.filename.rsplit('.', 1)[1].lower()
             filename = f"{uuid.uuid4().hex}.{ext}"
             file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
@@ -2144,11 +2684,25 @@ def admin_add_product():
                 image_url = url
             else:
                 extra_urls.append(url)
+
+    if image_files_to_check and not image_url and not extra_urls:
+        flash(
+            'Ảnh chưa được lưu. Vui lòng thử lại với file JPG, JPEG, PNG, GIF, WEBP, JFIF, HEIC, HEIF, BMP, AVIF hoặc TIFF.',
+            'error'
+        )
+        return redirect(url_for('admin_dashboard') + '?tab=products')
                 
     # Xử lý upload video
-    video_url = request.form.get('video_url', '')
+    video_url = (
+        request.form.get('direct_video_url')
+        or request.form.get('video_url')
+        or ''
+    ).strip()
     video_file = request.files.get('video_file')
-    if video_file and video_file.filename and allowed_file(video_file.filename):
+    if video_file and video_file.filename and not allowed_video_file(video_file.filename):
+        flash('Video không đúng định dạng. Vui lòng dùng MP4, MOV hoặc AVI.', 'error')
+        return redirect(url_for('admin_dashboard') + '?tab=products')
+    if video_file and video_file.filename and allowed_video_file(video_file.filename):
         ext = video_file.filename.rsplit('.', 1)[1].lower()
         filename = f"vid_{uuid.uuid4().hex}.{ext}"
         video_file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
@@ -2178,39 +2732,64 @@ def admin_edit_product(product_id):
 
     product = Product.query.get_or_404(product_id)
 
-    product.name = request.form.get('name', product.name).strip()
-    product.price = float(request.form.get('price', product.price) or 0)
-    old_price_str = request.form.get('old_price', '').strip()
-    product.old_price = float(old_price_str) if old_price_str else None
-    product.description = request.form.get('description', '').strip()
-    
-    category_action = request.form.get('category_action', f"{product.category_id}|{product.subcategory or ''}")
-    cat_parts = category_action.split('|')
-    product.category_id = int(cat_parts[0])
-    product.subcategory = cat_parts[1] if len(cat_parts) > 1 and cat_parts[1] else None
-    
-    product.stock = int(request.form.get('stock', product.stock or 100))
+    try:
+        product.name = (request.form.get('name', product.name) or '').strip()
+        if not product.name:
+            raise ValueError('Vui lòng nhập tên sản phẩm.')
+        product.price = _parse_currency_value(str(request.form.get('price', product.price) or ''), 'giá bán')
+        product.old_price = _parse_currency_value(request.form.get('old_price', ''), 'giá gốc', required=False)
+        if product.old_price is not None and product.old_price <= product.price:
+            raise ValueError('Giá gốc phải lớn hơn giá bán.')
+        product.description = request.form.get('description', '').strip()
+
+        category_id, subcategory = _parse_category_action(
+            request.form.get('category_action', f"{product.category_id}|{product.subcategory or ''}")
+        )
+        product.category_id = category_id
+        product.subcategory = subcategory
+
+        product.stock = _parse_stock_value(str(request.form.get('stock', product.stock or 100)))
+    except ValueError as exc:
+        flash(str(exc), 'error')
+        return redirect(url_for('admin_dashboard') + '?tab=products')
+
     product.is_new = bool(request.form.get('is_new'))
     product.is_on_sale = bool(request.form.get('is_on_sale'))
 
     # Update image if new ones uploaded
     files = request.files.getlist('image_files')
+    if len([file for file in files if file and file.filename]) > 8:
+        flash('Tối đa chỉ được tải lên 8 ảnh khi cập nhật sản phẩm.', 'error')
+        return redirect(url_for('admin_dashboard') + '?tab=products')
+    invalid_image_names = _invalid_upload_names(files, allowed_image_file)
+    if invalid_image_names:
+        flash(
+            'Ảnh không đúng định dạng: ' + ', '.join(invalid_image_names[:3]) +
+            ('' if len(invalid_image_names) <= 3 else '...') +
+            '. Vui lòng dùng JPG, JPEG, PNG, GIF, WEBP, JFIF, HEIC, HEIF, BMP, AVIF hoặc TIFF.',
+            'error'
+        )
+        return redirect(url_for('admin_dashboard') + '?tab=products')
     extra_urls = []
     has_new_images = False
-    
+
     for file in files:
-        if file and file.filename and allowed_file(file.filename):
+        if file and file.filename and allowed_image_file(file.filename):
             ext = file.filename.rsplit('.', 1)[1].lower()
             filename = f"{uuid.uuid4().hex}.{ext}"
             file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
             url = url_for('static', filename=f'uploads/{filename}')
             if not has_new_images:
+                # Xóa ảnh bìa cũ khỏi disk trước khi ghi đè
+                _delete_uploaded_file_from_url(product.image_url)
                 product.image_url = url
                 has_new_images = True
             else:
                 extra_urls.append(url)
-    
+
     if extra_urls:
+        # Xóa ảnh phụ cũ khỏi disk trước khi ghi đè
+        _delete_uploaded_media_list(product.extra_images)
         product.extra_images = json.dumps(extra_urls)
 
     # Allow setting a direct URL if provided
@@ -2301,12 +2880,9 @@ def admin_delete_product(product_id):
     if current_user.role != 'admin':
         return redirect(url_for('index'))
     product = Product.query.get_or_404(product_id)
-    # Xóa ảnh upload nếu có
-    if product.image_url and '/static/uploads/' in product.image_url:
-        filename = product.image_url.split('/static/uploads/')[-1]
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        if os.path.exists(filepath):
-            os.remove(filepath)
+    _delete_uploaded_file_from_url(product.image_url)
+    _delete_uploaded_media_list(product.extra_images)
+    _delete_uploaded_file_from_url(product.video_url)
             
     # Ngăn rác dữ liệu/crash trang web của người dùng bằng cách xoá sản phẩm khỏi giỏ hàng/wishlist
     CartItem.query.filter_by(product_id=product.id).delete()

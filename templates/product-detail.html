@@ -530,6 +530,7 @@
     <div class="detail-grid">
         <!-- GALLERY -->
         <div>
+            {% set primary_image_url = product.image_url or url_for('static', filename='logo.png') %}
             <style>
                 .gallery-nav:hover { background: #fff !important; box-shadow: 0 4px 10px rgba(0,0,0,0.3) !important; }
             </style>
@@ -537,7 +538,7 @@
                 {% if product.video_url %}
                 <video id="mainVideo" src="{{ product.video_url }}" controls style="display:none;width:100%;height:100%;object-fit:cover;"></video>
                 {% endif %}
-                <img id="mainImage" src="{{ product.image_url }}" alt="{{ product.name }}" style="display:block;">
+                <img id="mainImage" src="{{ primary_image_url }}" alt="{{ product.name }}" style="display:block;">
                 
                 <button class="gallery-nav prev" id="btnPrevMedia" onclick="navigateMedia(-1)" style="position:absolute;top:50%;left:10px;transform:translateY(-50%);background:rgba(255,255,255,0.8);border:none;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 5px rgba(0,0,0,0.2);z-index:10;transition:0.2s;">
                     <span class="material-symbols-outlined">chevron_left</span>
@@ -549,11 +550,9 @@
             
             <div class="gallery-thumbs" style="display:flex;gap:10px;margin-top:1rem;overflow-x:auto;padding-bottom:0.5rem">
                 <!-- Thumbnail 1 (Main Image) -->
-                {% if product.image_url %}
-                <div class="thumb-item active" style="width:70px;height:70px;border-radius:10px;overflow:hidden;cursor:pointer;border:2px solid var(--primary);flex-shrink:0" onclick="changeMainMedia('image', '{{ product.image_url }}', this)">
-                    <img src="{{ product.image_url }}" style="width:100%;height:100%;object-fit:cover;">
+                <div class="thumb-item active" style="width:70px;height:70px;border-radius:10px;overflow:hidden;cursor:pointer;border:2px solid var(--primary);flex-shrink:0" onclick="changeMainMedia('image', '{{ primary_image_url }}', this)">
+                    <img src="{{ primary_image_url }}" style="width:100%;height:100%;object-fit:cover;">
                 </div>
-                {% endif %}
                 
                 <!-- Extra Images -->
                 {% for img in extra_images_list %}
@@ -608,6 +607,7 @@
             
             <!-- SIZE -->
             {% set product_sizes = (product.sizes | fromjson) if product.sizes else [] %}
+            {% set default_selected_size = product_sizes[0] if product_sizes else '' %}
             {% if product_sizes %}
             <div class="size-section">
                 <div class="size-header">
@@ -615,12 +615,6 @@
                         <span class="size-title">Kích thước</span>
                         <span class="size-selected-badge" id="sizeSelectedBadge"></span>
                     </div>
-                    {% if product_sizes|length > 1 and product_sizes[0] != 'One Size' %}
-                    <a href="#" class="size-guide-link">
-                        <span class="material-symbols-outlined" style="font-size:0.9rem">straighten</span>
-                        Bảng size
-                    </a>
-                    {% endif %}
                 </div>
 
                 {% if product_sizes|length == 1 and product_sizes[0] == 'One Size' %}
@@ -634,7 +628,7 @@
                 {% else %}
                 <div class="size-grid">
                     {% for size in product_sizes %}
-                    <button class="size-btn {% if loop.first %}active{% endif %}" onclick="selectSize(this)" data-size="{{ size }}">
+                    <button type="button" class="size-btn {% if loop.first %}active{% endif %}" onclick="selectSize(this)" data-size="{{ size }}">
                         <span>{{ size }}</span>
                     </button>
                     {% endfor %}
@@ -659,6 +653,7 @@
                 <form action="{{ url_for('add_to_cart', product_id=product.id) }}" method="POST" id="add-cart-form">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="quantity" id="cart-qty" value="1">
+                    <input type="hidden" name="size" id="cart-size" value="{{ default_selected_size }}">
                     <button type="submit" class="btn btn-outline" style="width:100%">
                         <span class="material-symbols-outlined" style="font-size:1.1rem">shopping_bag</span>
                         Thêm vào giỏ
@@ -667,6 +662,7 @@
                 <form action="{{ url_for('add_to_cart', product_id=product.id) }}" method="POST" id="buy-now-form">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="quantity" id="buy-qty" value="1">
+                    <input type="hidden" name="size" id="buy-size" value="{{ default_selected_size }}">
                     <input type="hidden" name="next" value="{{ url_for('checkout') }}">
                     <button type="submit" class="btn btn-primary" style="width:100%">
                         Mua ngay
@@ -676,6 +672,7 @@
                 <form action="{{ url_for('add_to_cart', product_id=product.id) }}" method="POST" id="add-cart-form">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="quantity" id="cart-qty" value="1">
+                    <input type="hidden" name="size" id="cart-size" value="{{ default_selected_size }}">
                     <button type="submit" class="btn btn-outline" style="width:100%">
                         <span class="material-symbols-outlined" style="font-size:1.1rem">shopping_bag</span>
                         Thêm vào giỏ
@@ -684,6 +681,7 @@
                 <form action="{{ url_for('add_to_cart', product_id=product.id) }}" method="POST" id="buy-now-form">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="quantity" id="buy-qty" value="1">
+                    <input type="hidden" name="size" id="buy-size" value="{{ default_selected_size }}">
                     <input type="hidden" name="next" value="{{ url_for('checkout') }}">
                     <button type="submit" class="btn btn-primary" style="width:100%">
                         Mua ngay
@@ -824,7 +822,7 @@
   "@type": "Product",
   "name": {{ product.name|tojson }},
   "description": {{ (product.description or 'Sản phẩm tại UTH Store')|tojson }},
-  "image": [{{ product.image_url|tojson }}],
+  "image": [{{ (product.image_url or url_for('static', filename='logo.png'))|tojson }}],
   "sku": {{ ("UTH-%05d"|format(product.id))|tojson }},
   "offers": {
     "@type": "Offer",
@@ -880,24 +878,40 @@ function navigateMedia(dir) {
 function selectSize(btn) {
     document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    // Update the selected size badge
+    syncSelectedSize(btn.dataset.size || btn.textContent.trim());
+}
+
+function syncSelectedSize(sizeName) {
+    const normalizedSize = (sizeName || '').trim();
     const badge = document.getElementById('sizeSelectedBadge');
+    const cartSize = document.getElementById('cart-size');
+    const buySize = document.getElementById('buy-size');
+
     if (badge) {
-        const sizeName = btn.dataset.size || btn.textContent.trim();
-        badge.textContent = sizeName;
-        badge.classList.add('show');
+        if (normalizedSize) {
+            badge.textContent = normalizedSize;
+            badge.classList.add('show');
+        } else {
+            badge.textContent = '';
+            badge.classList.remove('show');
+        }
     }
+
+    if (cartSize) cartSize.value = normalizedSize;
+    if (buySize) buySize.value = normalizedSize;
 }
 
 // Init size badge on page load
 (function() {
     const activeBtn = document.querySelector('.size-btn.active');
     if (activeBtn) {
-        const badge = document.getElementById('sizeSelectedBadge');
-        if (badge) {
-            badge.textContent = activeBtn.dataset.size || activeBtn.textContent.trim();
-            badge.classList.add('show');
-        }
+        syncSelectedSize(activeBtn.dataset.size || activeBtn.textContent.trim());
+        return;
+    }
+
+    const cartSize = document.getElementById('cart-size');
+    if (cartSize && cartSize.value) {
+        syncSelectedSize(cartSize.value);
     }
 })();
 

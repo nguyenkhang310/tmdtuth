@@ -752,7 +752,7 @@
                 <div class="admin-section-header">
                     <h2><span class="material-symbols-outlined">add_circle</span> Thêm sản phẩm mới</h2>
                 </div>
-                <form action="{{ url_for('admin_add_product') }}" method="POST" enctype="multipart/form-data">
+                <form id="addProductForm" action="{{ url_for('admin_add_product') }}" method="POST" enctype="multipart/form-data">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="quick-add-form">
                         <div class="form-group">
@@ -839,11 +839,13 @@
                                         <span class="txt">(0/1)</span>
                                         <input type="file" name="image_file" accept="image/*" onchange="handleShopeeCover(this)">
                                     </div>
-                                    <div class="shopee-note" style="margin-top:0;flex:1">
+                                <div class="shopee-note" style="margin-top:0;flex:1">
                                         <ul>
                                             <li>Tải lên hình ảnh tỷ lệ 1:1.</li>
                                             <li>Ảnh bìa sẽ được hiển thị tại các trang Kết quả tìm kiếm, Gợi ý hôm nay,...</li>
                                             <li>Việc sử dụng hình ảnh sắc nét, đẹp sẽ thu hút thêm lượt truy cập.</li>
+                                            <li>Sản phẩm mới cần có ít nhất 1 hình ảnh hợp lệ.</li>
+                                            <li>Định dạng hỗ trợ: JPG, JPEG, PNG, GIF, WEBP, JFIF, HEIC, HEIF, BMP, AVIF, TIF, TIFF.</li>
                                         </ul>
                                     </div>
                                 </div>
@@ -866,6 +868,7 @@
                                 </div>
                                 <div class="shopee-note">
                                     Mọi hình ảnh tải lên sẽ tuân thủ với tiêu chuẩn quy định của nền tảng của chúng tôi. Chúng tôi tự động chống sao chép và đóng dấu bản quyền cho các hình ảnh. Bạn có thể thay đổi thiết lập trong Cài đặt thông tin điểm bán.
+                                    <br>Định dạng hỗ trợ: JPG, JPEG, PNG, GIF, WEBP, JFIF, HEIC, HEIF, BMP, AVIF, TIF, TIFF.
                                 </div>
                             </div>
                             
@@ -889,8 +892,21 @@
                                 </div>
                             </div>
                         </div>
+                        
 
-
+                        <div class="form-group full-width" style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:1.1rem;grid-column:1/-1;">
+                            <label class="form-label" style="color:#9a3412">Media URL trực tiếp (tùy chọn)</label>
+                            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:1rem">
+                                <div>
+                                    <input type="text" name="direct_image_url" class="form-input" placeholder="Dán URL ảnh chính nếu không tải file lên">
+                                    <div style="font-size:0.78rem;color:#9a3412;margin-top:0.35rem">Nếu có cả file upload và URL, hệ thống sẽ ưu tiên file upload.</div>
+                                </div>
+                                <div>
+                                    <input type="text" name="direct_video_url" class="form-input" placeholder="Dán URL video nếu không tải file lên">
+                                    <div style="font-size:0.78rem;color:#9a3412;margin-top:0.35rem">Dùng khi video đã được lưu trên CDN hoặc nguồn ngoài.</div>
+                                </div>
+                            </div>
+                        </div>
 
                         <!-- Description -->
                         <div class="form-group full-width">
@@ -1064,10 +1080,19 @@ VD: Áo sơ mi Oxford cao cấp, chất liệu cotton 100% thoáng mát, form re
                                     Hủy lúc {{ (order.cancelled_at or order.created_at).strftime('%d/%m/%Y %H:%M') }}
                                 </div>
                             </div>
-                            <a href="{{ url_for('order_detail', order_id=order.id) }}" class="action-btn edit" style="width:auto;padding:0.45rem 0.75rem;text-decoration:none;display:flex;align-items:center;gap:0.35rem">
-                                <span class="material-symbols-outlined" style="font-size:1rem">visibility</span>
-                                Xem đơn
-                            </a>
+                            <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
+                                <a href="{{ url_for('order_detail', order_id=order.id) }}" class="action-btn edit" style="width:auto;padding:0.45rem 0.75rem;text-decoration:none;display:flex;align-items:center;gap:0.35rem">
+                                    <span class="material-symbols-outlined" style="font-size:1rem">visibility</span>
+                                    Xem đơn
+                                </a>
+                                <form method="POST" action="{{ url_for('admin_dismiss_cancel_notification', order_id=order.id) }}" style="margin:0">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="action-btn delete" style="width:auto;padding:0.45rem 0.75rem;border:none;display:flex;align-items:center;gap:0.35rem" title="Xóa thông báo">
+                                        <span class="material-symbols-outlined" style="font-size:1rem">done</span>
+                                        Xóa thông báo
+                                    </button>
+                                </form>
+                            </div>
                         </div>
                         <div style="margin-top:0.75rem;font-size:0.88rem;color:#991b1b">
                             <strong>Lý do:</strong> {{ order.cancel_reason or 'Đơn hàng được hủy.' }}
@@ -1080,17 +1105,30 @@ VD: Áo sơ mi Oxford cao cấp, chất liệu cotton 100% thoáng mát, form re
 
             <div class="admin-section">
                 <div class="admin-section-header">
-                    <h2><span class="material-symbols-outlined">receipt_long</span> Đơn hàng gần đây</h2>
+                    <h2><span class="material-symbols-outlined">receipt_long</span> Tất cả đơn hàng</h2>
+                </div>
+                <!-- Thanh tìm kiếm và lọc -->
+                <div style="display:flex;gap:0.75rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center">
+                    <input type="text" id="order-search" class="form-input" placeholder="Tìm mã đơn hoặc tên khách..." style="max-width:260px;padding:0.55rem 0.8rem;font-size:0.85rem" oninput="filterOrders()">
+                    <select id="order-status-filter" class="form-select" style="max-width:180px;padding:0.55rem 0.8rem;font-size:0.85rem" onchange="filterOrders()">
+                        <option value="">Tất cả trạng thái</option>
+                        <option value="pending">Chờ xử lý</option>
+                        <option value="paid">Đã thanh toán</option>
+                        <option value="shipped">Đang giao</option>
+                        <option value="delivered">Hoàn thành</option>
+                        <option value="cancelled">Đã huỷ</option>
+                    </select>
+                    <span id="order-count-label" style="font-size:0.82rem;color:var(--text-muted)"></span>
                 </div>
                 {% if analytics.recent_orders %}
                 <div style="overflow-x:auto">
-                    <table class="admin-table">
+                    <table class="admin-table" id="orders-table">
                         <thead>
                             <tr><th>#</th><th>Khách hàng</th><th>Tổng tiền</th><th>Thanh toán</th><th>Trạng thái</th><th>Ngày đặt</th><th>Cập nhật</th></tr>
                         </thead>
                         <tbody>
                             {% for order in analytics.recent_orders %}
-                            <tr>
+                            <tr class="order-row" data-status="{{ order.status }}" data-search="{{ order.id }} {{ order.user.display_name|lower if order.user else '' }} {{ (order.shipping_name or '')|lower }}">
                                 <td>
                                     <a href="{{ url_for('order_detail', order_id=order.id) }}" style="font-weight:800;color:var(--text);text-decoration:none">
                                         #{{ order.id }}
@@ -1105,15 +1143,15 @@ VD: Áo sơ mi Oxford cao cấp, chất liệu cotton 100% thoáng mát, form re
                                 <td style="color:var(--primary);font-weight:700">{{ "{:,.0f}".format(order.total_amount) }}đ</td>
                                 <td>
                                     {% if order.payment_status == 'paid' %}
-                                        <span class="badge badge-green">Paid</span>
+                                        <span class="badge badge-green">Đã thanh toán</span>
                                     {% elif order.payment_status == 'initiated' %}
-                                        <span class="badge badge-blue">Initiated</span>
+                                        <span class="badge badge-blue">Đang chờ TT</span>
                                     {% elif order.payment_status == 'cancelled' %}
-                                        <span class="badge badge-red">Cancelled</span>
+                                        <span class="badge badge-red">TT đã hủy</span>
                                     {% elif order.payment_status == 'failed' %}
-                                        <span class="badge badge-red">Failed</span>
+                                        <span class="badge badge-red">TT thất bại</span>
                                     {% else %}
-                                        <span class="badge badge-gray">Unpaid</span>
+                                        <span class="badge badge-gray">Chưa TT</span>
                                     {% endif %}
                                 </td>
                                 <td>
@@ -1126,6 +1164,11 @@ VD: Áo sơ mi Oxford cao cấp, chất liệu cotton 100% thoáng mát, form re
                                 </td>
                                 <td style="font-size:0.8rem;color:var(--text-muted)">{{ order.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
                                 <td>
+                                    {% if order.status == 'cancelled' %}
+                                    <a href="{{ url_for('order_detail', order_id=order.id) }}" class="action-btn edit" title="Xem đơn" style="width:auto;padding:0 0.5rem;font-size:0.75rem;border-radius:6px;text-decoration:none;display:flex;align-items:center">
+                                        <span class="material-symbols-outlined">visibility</span>
+                                    </a>
+                                    {% else %}
                                     <form action="{{ url_for('admin_update_order_status', order_id=order.id) }}" method="POST" style="display:flex;gap:0.5rem;align-items:center">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                         <select name="status" class="status-select">
@@ -1142,12 +1185,14 @@ VD: Áo sơ mi Oxford cao cấp, chất liệu cotton 100% thoáng mát, form re
                                             <span class="material-symbols-outlined">visibility</span>
                                         </a>
                                     </form>
+                                    {% endif %}
                                 </td>
                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
+                <div id="orders-pagination" style="display:flex;justify-content:center;gap:0.35rem;margin-top:1.25rem;flex-wrap:wrap"></div>
                 {% else %}
                 <div style="text-align:center;padding:3rem;color:var(--text-muted)">
                     <span class="material-symbols-outlined" style="font-size:3rem;display:block;margin-bottom:0.75rem;opacity:0.4">receipt_long</span>
@@ -1161,27 +1206,38 @@ VD: Áo sơ mi Oxford cao cấp, chất liệu cotton 100% thoáng mát, form re
                     <h2><span class="material-symbols-outlined">payments</span> Lịch sử giao dịch thanh toán</h2>
                 </div>
                 {% if payment_transactions %}
+                <!-- Bộ lọc giao dịch -->
+                <div style="display:flex;gap:0.75rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center">
+                    <select id="tx-status-filter" class="form-select" style="max-width:200px;padding:0.55rem 0.8rem;font-size:0.85rem" onchange="filterTransactions()">
+                        <option value="">Tất cả trạng thái</option>
+                        <option value="paid">Thành công</option>
+                        <option value="failed">Thất bại</option>
+                        <option value="initiated">Đang chờ</option>
+                    </select>
+                    <span id="tx-count-label" style="font-size:0.82rem;color:var(--text-muted)"></span>
+                </div>
                 <div style="overflow-x:auto">
-                    <table class="admin-table">
+                    <table class="admin-table" id="tx-table">
                         <thead><tr><th>Thời gian</th><th>Đơn</th><th>Cổng</th><th>Số tiền</th><th>Ref</th><th>Trạng thái</th></tr></thead>
                         <tbody>
                         {% for tx in payment_transactions %}
-                            <tr>
+                            <tr class="tx-row" data-status="{{ tx.status }}">
                                 <td style="font-size:0.8rem;color:var(--text-muted)">{{ tx.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
                                 <td><a href="{{ url_for('order_detail', order_id=tx.order_id) }}" style="text-decoration:none;font-weight:700;color:var(--text)">#{{ tx.order_id }}</a></td>
                                 <td>{{ tx.provider }}</td>
                                 <td>{{ "{:,.0f}".format(tx.amount) }}đ</td>
-                                <td>{{ tx.provider_ref or '—' }}</td>
+                                <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ tx.provider_ref or '—' }}</td>
                                 <td>
-                                    {% if tx.status == 'paid' %}<span class="badge badge-green">Paid</span>
-                                    {% elif tx.status == 'failed' %}<span class="badge badge-red">Failed</span>
-                                    {% else %}<span class="badge badge-yellow">{{ tx.status }}</span>{% endif %}
+                                    {% if tx.status == 'paid' %}<span class="badge badge-green">Thành công</span>
+                                    {% elif tx.status == 'failed' %}<span class="badge badge-red">Thất bại</span>
+                                    {% else %}<span class="badge badge-yellow">Đang chờ</span>{% endif %}
                                 </td>
                             </tr>
                         {% endfor %}
                         </tbody>
                     </table>
                 </div>
+                <div id="tx-pagination" style="display:flex;justify-content:center;gap:0.35rem;margin-top:1.25rem;flex-wrap:wrap"></div>
                 {% else %}
                 <div style="text-align:center;padding:2rem;color:var(--text-muted)">Chưa có giao dịch thanh toán.</div>
                 {% endif %}
@@ -1549,6 +1605,42 @@ function formatPrice(input, hiddenId) {
     hiddenInput.value = rawValue;
 }
 
+function getPriceValue(hiddenId) {
+    const input = document.getElementById(hiddenId);
+    if (!input) return null;
+    const rawValue = String(input.value || '').trim();
+    if (!rawValue) return null;
+    const parsedValue = Number(rawValue);
+    return Number.isFinite(parsedValue) ? parsedValue : null;
+}
+
+function bindProductPriceValidation(formId, priceDisplayId, priceHiddenId, oldPriceDisplayId, oldPriceHiddenId) {
+    const form = document.getElementById(formId);
+    const priceDisplay = document.getElementById(priceDisplayId);
+    const oldPriceDisplay = document.getElementById(oldPriceDisplayId);
+    if (!form || !priceDisplay || !oldPriceDisplay) return;
+
+    const clearValidation = () => oldPriceDisplay.setCustomValidity('');
+    priceDisplay.addEventListener('input', clearValidation);
+    oldPriceDisplay.addEventListener('input', clearValidation);
+
+    form.addEventListener('submit', function(e) {
+        clearValidation();
+        const price = getPriceValue(priceHiddenId);
+        const oldPrice = getPriceValue(oldPriceHiddenId);
+
+        if (price !== null && oldPrice !== null && oldPrice <= price) {
+            e.preventDefault();
+            oldPriceDisplay.setCustomValidity('Giá gốc phải lớn hơn giá bán.');
+            oldPriceDisplay.reportValidity();
+            oldPriceDisplay.focus();
+        }
+    });
+}
+
+bindProductPriceValidation('addProductForm', 'price_display', 'price_value', 'old_price_display', 'old_price_value');
+bindProductPriceValidation('editProductForm', 'edit_price_display', 'edit_price', 'edit_old_price_display', 'edit_old_price');
+
 // ===== SIZES QUICK FILL =====
 function fillSizes(val) {
     const el = document.getElementById('sizes_input');
@@ -1579,6 +1671,7 @@ function openEditModal(btn) {
     } else {
         document.getElementById('edit_old_price_display').value = '';
     }
+    document.getElementById('edit_old_price_display').setCustomValidity('');
     
     document.getElementById('edit_stock').value = d.stock || 100;
     document.getElementById('edit_description').value = d.description || '';
@@ -1962,5 +2055,149 @@ if (ordersCtx) {
         }
     });
 }
+
+// ===== ĐƠN HÀNG: Tìm kiếm, lọc, phân trang =====
+const ORDERS_PER_PAGE = 15;
+let orderCurrentPage = 1;
+
+function filterOrders() {
+    orderCurrentPage = 1;
+    renderOrders();
+}
+
+function renderOrders() {
+    const search = (document.getElementById('order-search')?.value || '').toLowerCase().trim();
+    const status = document.getElementById('order-status-filter')?.value || '';
+    const rows = document.querySelectorAll('.order-row');
+    const matched = [];
+
+    rows.forEach(row => {
+        const rowStatus = row.getAttribute('data-status') || '';
+        const rowSearch = row.getAttribute('data-search') || '';
+        const statusOk = !status || rowStatus === status;
+        const searchOk = !search || rowSearch.includes(search);
+        if (statusOk && searchOk) {
+            matched.push(row);
+        }
+        row.style.display = 'none';
+    });
+
+    const totalPages = Math.ceil(matched.length / ORDERS_PER_PAGE) || 1;
+    if (orderCurrentPage > totalPages) orderCurrentPage = totalPages;
+    const start = (orderCurrentPage - 1) * ORDERS_PER_PAGE;
+    const end = start + ORDERS_PER_PAGE;
+
+    matched.forEach((row, i) => {
+        row.style.display = (i >= start && i < end) ? '' : 'none';
+    });
+
+    const label = document.getElementById('order-count-label');
+    if (label) {
+        label.textContent = `Hiển thị ${Math.min(end, matched.length)}/${matched.length} đơn` +
+            (matched.length < rows.length ? ` (lọc từ ${rows.length})` : '');
+    }
+
+    renderPagination('orders-pagination', totalPages, orderCurrentPage, page => {
+        orderCurrentPage = page;
+        renderOrders();
+    });
+}
+
+// ===== GIAO DỊCH: Lọc, phân trang =====
+const TX_PER_PAGE = 20;
+let txCurrentPage = 1;
+
+function filterTransactions() {
+    txCurrentPage = 1;
+    renderTransactions();
+}
+
+function renderTransactions() {
+    const status = document.getElementById('tx-status-filter')?.value || '';
+    const rows = document.querySelectorAll('.tx-row');
+    const matched = [];
+
+    rows.forEach(row => {
+        const rowStatus = row.getAttribute('data-status') || '';
+        const statusOk = !status || rowStatus === status;
+        if (statusOk) {
+            matched.push(row);
+        }
+        row.style.display = 'none';
+    });
+
+    const totalPages = Math.ceil(matched.length / TX_PER_PAGE) || 1;
+    if (txCurrentPage > totalPages) txCurrentPage = totalPages;
+    const start = (txCurrentPage - 1) * TX_PER_PAGE;
+    const end = start + TX_PER_PAGE;
+
+    matched.forEach((row, i) => {
+        row.style.display = (i >= start && i < end) ? '' : 'none';
+    });
+
+    const label = document.getElementById('tx-count-label');
+    if (label) {
+        label.textContent = `${matched.length} giao dịch` +
+            (matched.length < rows.length ? ` (lọc từ ${rows.length})` : '');
+    }
+
+    renderPagination('tx-pagination', totalPages, txCurrentPage, page => {
+        txCurrentPage = page;
+        renderTransactions();
+    });
+}
+
+// ===== PHÂN TRANG CHUNG =====
+function renderPagination(containerId, totalPages, current, onPageClick) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.innerHTML = '';
+    if (totalPages <= 1) return;
+
+    const btnStyle = 'padding:0.35rem 0.65rem;border-radius:6px;border:1px solid var(--border);background:#fff;cursor:pointer;font-size:0.8rem;font-weight:600;font-family:inherit;';
+    const activeStyle = btnStyle + 'background:var(--primary);color:#fff;border-color:var(--primary);';
+
+    // Prev
+    if (current > 1) {
+        const prev = document.createElement('button');
+        prev.innerHTML = '‹';
+        prev.style.cssText = btnStyle;
+        prev.onclick = () => onPageClick(current - 1);
+        container.appendChild(prev);
+    }
+
+    for (let p = 1; p <= totalPages; p++) {
+        if (totalPages > 7 && p > 2 && p < totalPages - 1 && Math.abs(p - current) > 1) {
+            if (p === 3 || p === totalPages - 2) {
+                const dot = document.createElement('span');
+                dot.textContent = '…';
+                dot.style.cssText = 'padding:0.35rem 0.3rem;font-size:0.8rem;color:var(--text-muted);';
+                container.appendChild(dot);
+            }
+            continue;
+        }
+        const btn = document.createElement('button');
+        btn.textContent = p;
+        btn.style.cssText = p === current ? activeStyle : btnStyle;
+        btn.onclick = () => onPageClick(p);
+        container.appendChild(btn);
+    }
+
+    // Next
+    if (current < totalPages) {
+        const next = document.createElement('button');
+        next.innerHTML = '›';
+        next.style.cssText = btnStyle;
+        next.onclick = () => onPageClick(current + 1);
+        container.appendChild(next);
+    }
+}
+
+// Init on load
+document.addEventListener('DOMContentLoaded', function() {
+    if (document.querySelector('.order-row')) renderOrders();
+    if (document.querySelector('.tx-row')) renderTransactions();
+});
+
 </script>
 {% endblock %}

@@ -93,7 +93,12 @@ pre{white-space:pre-wrap;background:var(--surface2);border-radius:12px;padding:1
       <div style="font-weight:900;margin-bottom:0.75rem">Sản phẩm</div>
       {% for it in order.items %}
         <div class="row">
-          <span class="muted">{{ it.product.name if it.product else ('#'+it.product_id|string) }} × {{ it.quantity }}</span>
+          <span class="muted">
+            {{ it.product.name if it.product else ('#'+it.product_id|string) }} × {{ it.quantity }}
+            {% if it.size %}
+            <br><span style="font-size:0.8rem">Size: {{ it.size }}</span>
+            {% endif %}
+          </span>
           <span style="font-weight:800">{{ "{:,.0f}".format(it.price * it.quantity) }}đ</span>
         </div>
       {% endfor %}
@@ -138,12 +143,16 @@ pre{white-space:pre-wrap;background:var(--surface2);border-radius:12px;padding:1
         <div style="margin-top:1rem" class="muted">
           {% if order.status == 'cancelled' %}
             Đơn hàng đã bị hủy nên không thể tiếp tục thanh toán qua VNPAY.
+          {% elif order.payment_status == 'paid' %}
+            Đơn hàng đã được thanh toán thành công qua VNPAY.
           {% else %}
-            Bấm nút bên dưới để thanh toán qua VNPAY.
+            Bạn có thể bấm nút bên dưới để tạo lại giao dịch và thanh toán qua VNPAY.
           {% endif %}
         </div>
-        {% if order.status != 'cancelled' %}
-        <a class="btn primary" style="margin-top:1rem;width:100%" href="{{ url_for('vnpay_create', order_id=order.id) }}">Thanh toán VNPAY</a>
+        {% if order.payment_status != 'paid' and order.status != 'cancelled' %}
+        <a class="btn primary" style="margin-top:1rem;width:100%" href="{{ url_for('vnpay_create', order_id=order.id) }}">
+          {{ 'Thanh toán lại VNPAY' if order.payment_status in ['initiated', 'failed', 'cancelled'] else 'Thanh toán VNPAY' }}
+        </a>
         {% endif %}
       {% endif %}
     </div>
